@@ -1,0 +1,183 @@
+import pluginVue from 'eslint-plugin-vue'
+import tseslint from 'typescript-eslint'
+import stylistic from '@stylistic/eslint-plugin'
+import simpleImportSort from 'eslint-plugin-simple-import-sort'
+import importX from 'eslint-plugin-import-x'
+import globals from 'globals'
+import eslintPluginVueScopedCSS from 'eslint-plugin-vue-scoped-css';
+
+
+const commonRules = {
+  '@stylistic/array-bracket-spacing': ['error', 'never'],
+  '@stylistic/arrow-spacing': ['error', { before: true, after: true }],
+  '@stylistic/brace-style': ['error', '1tbs', { allowSingleLine: true }],
+  '@stylistic/comma-dangle': ['error', 'always-multiline'],
+  '@stylistic/eol-last': 'error',
+  '@stylistic/indent': ['error', 2],
+  '@stylistic/keyword-spacing': ['error', { before: true, after: true }],
+  '@stylistic/no-multiple-empty-lines': ['error', { max: 1, maxEOF: 0 }],
+  '@stylistic/no-trailing-spaces': 'error',
+  '@stylistic/object-curly-spacing': ['error', 'always'],
+  '@stylistic/quotes': ['error', 'single', { avoidEscape: true }],
+  '@stylistic/semi': ['error', 'always'],
+  '@stylistic/space-before-function-paren': ['error', { anonymous: 'always', named: 'never', asyncArrow: 'always' }],
+  '@stylistic/space-infix-ops': 'error',
+  '@typescript-eslint/explicit-function-return-type': 'off',
+  '@typescript-eslint/explicit-module-boundary-types': 'off',
+  '@typescript-eslint/restrict-template-expressions': 'off',
+  '@typescript-eslint/no-empty-function': 'off',
+  '@typescript-eslint/no-extraneous-class': 'off',
+  '@typescript-eslint/no-explicit-any': 'warn',
+  '@typescript-eslint/no-non-null-assertion': 'warn',
+  '@typescript-eslint/no-unused-vars': 'off',
+  '@typescript-eslint/no-unnecessary-condition': 'off',
+  '@typescript-eslint/no-unnecessary-type-arguments': 'off',
+  '@typescript-eslint/no-var-requires': 'error',
+  '@typescript-eslint/no-unsafe-assignment': 'off',
+  '@typescript-eslint/no-unsafe-call': 'off',
+  'comma-spacing': 'error',
+  'eqeqeq': ['error', 'always'],
+  'import-x/first': 'error',
+  'import-x/newline-after-import': 'error',
+  'import-x/no-duplicates': 'error',
+  'import-x/no-restricted-paths': ['error', {
+    basePath: import.meta.dirname,
+    zones: [
+      {
+        target: './src/components',
+        from: './src/protocol',
+        message: 'components 层禁止直接依赖 protocol 层，请改为通过 application/service facade 访问。',
+      },
+      {
+        target: './src/views',
+        from: './src/protocol',
+        message: 'views 层禁止直接依赖 protocol 层，请改为通过 application/service facade 访问。',
+      },
+      {
+        target: './src/components/operaiton',
+        from: './src/platform',
+        message: 'operaiton 展示组件禁止依赖 platform 层，请通过 CartBurner 容器或应用层接口注入能力。',
+      },
+      {
+        target: './src/components/operaiton',
+        from: './src/services',
+        message: 'operaiton 展示组件禁止依赖 services 具体实现，请通过 CartBurner 容器事件和状态契约访问。',
+      },
+      {
+        target: './src/components/operaiton',
+        from: './src/features/burner/application',
+        message: 'operaiton 展示组件禁止直接依赖 burner orchestration 实现，请保持容器边界。',
+      },
+      {
+        target: './src/protocol',
+        from: './src/services/serial-service',
+        message: 'protocol 层禁止直接依赖 services/serial-service，请改为依赖 platform/serial 的 Transport 接口。',
+      },
+      {
+        target: './src/protocol',
+        from: './src/platform/serial/electron',
+        message: 'protocol 层禁止依赖 runtime-specific serial 实现（electron），请改为依赖 platform/serial Transport 合约。',
+      },
+      {
+        target: './src/protocol',
+        from: './src/platform/serial/web',
+        message: 'protocol 层禁止依赖 runtime-specific serial 实现（web），请改为依赖 platform/serial Transport 合约。',
+      },
+      {
+        target: './src/protocol',
+        from: './src/platform/serial/transports',
+        message: 'protocol 层禁止依赖具体 transport 实现，请改为依赖 platform/serial 导出的 Transport 合约。',
+      },
+      {
+        target: ['./src/services', './src/features'],
+        from: './src/protocol/beggar_socket',
+        message: 'application/service 层禁止依赖 protocol 内部路径，请改为从 @/protocol 入口导入。',
+      },
+      {
+        target: './src/types',
+        from: './src/services',
+        message: 'types 层禁止依赖 services 层，请将共享类型下沉到 shared/platform types。',
+      },
+      {
+        target: './src/utils',
+        from: './src/services',
+        message: 'utils 层禁止依赖 services 层，请通过类型下沉或接口反转解耦。',
+      },
+    ],
+  }],
+  'no-constant-condition': ['error', { checkLoops: false }],
+  'no-duplicate-imports': 'error',
+  'no-extra-semi': 'off',
+  'no-mixed-spaces-and-tabs': 'error',
+  'no-multi-spaces': 'error',
+  'no-redeclare': 'error',
+  'no-shadow': 'error',
+  'no-throw-literal': 'error',
+  'no-undef': 'off',
+  'no-unused-expressions': ['error', { allowShortCircuit: true, allowTernary: true }],
+  'no-use-before-define': ['error', { functions: false, classes: true, variables: true }],
+  'no-var': 'error',
+  'prefer-const': 'error',
+  'simple-import-sort/exports': 'error',
+  'simple-import-sort/imports': 'error',
+}
+
+export default tseslint.config(
+  // TypeScript files with type checking
+  {
+    files: [
+      'src/**/*.{ts,vue,tsx}',
+      'tests/**/*.{ts,vue,tsx}'
+    ],
+    extends: [
+      ...tseslint.configs.strictTypeChecked,
+      ...tseslint.configs.stylisticTypeChecked,
+      ...pluginVue.configs['flat/recommended'],
+    ],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      parserOptions: {
+        project: true,
+        extraFileExtensions: ['.vue'],
+        tsconfigRootDir: import.meta.dirname,
+        parser: tseslint.parser,
+      },
+      globals: {
+        ...globals.browser,
+        ...globals.node
+      }
+    },
+    plugins: {
+      '@stylistic': stylistic,
+      'simple-import-sort': simpleImportSort,
+      'import-x': importX,
+    },
+    rules: {
+      ...commonRules,
+    },
+    settings: {
+      'import-x/resolver': {
+        typescript: {
+          project: './tsconfig.json',
+        },
+        node: false,
+      },
+    },
+  },
+  // Vue files configuration
+  ...eslintPluginVueScopedCSS.configs['flat/recommended'],
+  // JavaScript files configuration
+  {
+    files: ['**/*.{js,mjs,cjs}'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: {
+        ...globals.browser,
+        ...globals.node
+      }
+    },
+    rules: {
+    }
+  }
+)

@@ -1,0 +1,113 @@
+import { accessSync, constants, existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { createRequire } from 'node:module';
+import { delimiter, dirname, join } from 'node:path';
+import { spawn } from 'node:child_process';
+
+function canExecute(filePath) {
+  try {
+    accessSync(filePath, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveCargoBinDir() {
+  const candidates = [
+    process.env.CARGO_HOME ? join(process.env.CARGO_HOME, 'bin') : null,
+    join(homedir(), '.cargo', 'bin'),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+
+    const cargoBinary = join(candidate, process.platform === 'win32' ? 'cargo.exe' : 'cargo');
+    if (canExecute(cargoBinary)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function getPathEnvKey(env) {
+  if (process.platform !== 'win32') {
+    return 'PATH';
+  }
+
+  return Object.keys(env).find(key => key.toLowerCase() === 'path') ?? 'Path';
+}
+
+const [, , command, ...forwardedArgs] = process.argv;
+
+if (!command || (command !== 'dev' && command !== 'build')) {
+  console.error('Usage: node scripts/run-tauri.mjs <dev|build> [...args]');
+  process.exit(1);
+}
+
+const env = { ...process.env };
+const require = createRequire(import.meta.url);
+const cargoBinDir = resolveCargoBinDir();
+const pathEnvKey = getPathEnvKey(env);
+
+if (cargoBinDir) {
+  const pathEntries = (env[pathEnvKey] ?? '').split(delimiter).filter(Boolean);
+  if (!pathEntries.includes(cargoBinDir)) {
+    env[pathEnvKey] = [cargoBinDir, ...pathEntries].join(delimiter);
+  }
+}
+
+const cargoBinaryName = process.platform === 'win32' ? 'cargo.exe' : 'cargo';
+const hasCargoOnPath = (env[pathEnvKey] ?? '')
+  .split(delimiter)
+  .filter(Boolean)
+  .some(entry => canExecute(join(entry, cargoBinaryName)));
+
+if (!hasCargoOnPath) {
+  console.error([
+    'Rust toolchain not found.',
+    'Install rustup/cargo first, or make sure cargo is available on PATH.',
+    'If rustup is already installed, try running: source "$HOME/.cargo/env"',
+  ].join('\n'));
+  process.exit(1);
+}
+
+let tauriCliEntrypoint;
+
+try {
+  const tauriPackageJson = require.resolve('@tauri-apps/cli/package.json');
+  tauriCliEntrypoint = join(dirname(tauriPackageJson), 'tauri.js');
+} catch {
+  console.error([
+    'Tauri CLI not found.',
+    'Run npm ci in web-client so @tauri-apps/cli is installed before building.',
+  ].join('\n'));
+  process.exit(1);
+}
+
+const tauriProcess = spawn(
+  process.execPath,
+  [tauriCliEntrypoint, command, ...forwardedArgs],
+  {
+    env,
+    stdio: 'inherit',
+    shell: false,
+  },
+);
+
+tauriProcess.on('exit', (code, signal) => {
+  if (signal) {
+    process.kill(process.pid, signal);
+    return;
+  }
+
+  process.exit(code ?? 1);
+});
+
+tauriProcess.on('error', (error) => {
+  console.error(`Failed to start Tauri CLI: ${error.message}`);
+  process.exit(1);
+});

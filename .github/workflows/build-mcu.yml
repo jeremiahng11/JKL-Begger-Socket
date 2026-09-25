@@ -1,0 +1,199 @@
+name: Build STM32 MCU Firmware
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'mcu/**'
+      - '.github/workflows/build-mcu.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'mcu/**'
+      - '.github/workflows/build-mcu.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-stm32:
+    name: Build STM32F103 Firmware
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        config:
+          - name: "Debug Build"
+            build_type: "Debug"
+            debug: 1
+          - name: "Release Build"
+            build_type: "Release"
+            debug: 0
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Install ARM Toolchain and Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc-arm-none-eabi \
+          binutils-arm-none-eabi \
+          libnewlib-arm-none-eabi \
+          libstdc++-arm-none-eabi-newlib \
+          ninja-build \
+          cmake \
+          build-essential
+
+    - name: Verify Toolchain Installation
+      run: |
+        arm-none-eabi-gcc --version
+        arm-none-eabi-objcopy --version
+        ninja --version
+        cmake --version
+        # Test compilation of a simple program
+        echo 'int main() { return 0; }' > test.c
+        arm-none-eabi-gcc -mcpu=cortex-m3 -mthumb -c test.c -o test.o
+        rm -f test.c test.o
+
+    - name: Set Build Environment
+      run: |
+        echo "BUILD_TYPE=${{ matrix.config.build_type }}" >> $GITHUB_ENV
+
+    - name: Build Firmware
+      working-directory: mcu
+      run: |
+        ./cmake-build.sh build ${{ matrix.config.build_type }}
+
+    - name: Check Build Artifacts
+      working-directory: mcu/chis_flash_burner
+      run: |
+        echo "Build artifacts for ${{ matrix.config.build_type }}:"
+        ls -la build/${{ matrix.config.build_type }}/ || echo "No build directory found"
+        if [ -f "build/${{ matrix.config.build_type }}/chis_flash_burner.elf" ]; then
+          echo "=== Size Information ==="
+          arm-none-eabi-size build/${{ matrix.config.build_type }}/chis_flash_burner.elf
+          echo "=== Section Headers ==="
+          arm-none-eabi-objdump -h build/${{ matrix.config.build_type }}/chis_flash_burner.elf
+        fi
+
+    - name: Upload Firmware Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: stm32-firmware-${{ matrix.config.build_type }}-${{ github.sha }}
+        path: |
+          mcu/chis_flash_burner/build/${{ matrix.config.build_type }}/*.elf
+          mcu/chis_flash_burner/build/${{ matrix.config.build_type }}/*.hex
+          mcu/chis_flash_burner/build/${{ matrix.config.build_type }}/*.bin
+          mcu/chis_flash_burner/build/${{ matrix.config.build_type }}/*.map
+        retention-days: 30
+
+    - name: Archive Build Logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs-${{ matrix.config.build_type }}-${{ github.sha }}
+        path: |
+          mcu/chis_flash_burner/build/${{ matrix.config.build_type }}/*.lst
+        retention-days: 7
+
+  # Static analysis job
+  static-analysis:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck clang-format
+
+    - name: Run CPPCheck
+      working-directory: mcu/chis_flash_burner
+      run: |
+        cppcheck --enable=all --force --xml --xml-version=2 \
+          --suppress=missingIncludeSystem \
+          --suppress=unusedFunction \
+          --suppress=unmatchedSuppression \
+          -I Core/Inc \
+          -I Drivers/CMSIS/Device/ST/STM32F1xx/Include \
+          -I Drivers/CMSIS/Include \
+          -I Drivers/STM32F1xx_HAL_Driver/Inc \
+          -I Drivers/STM32F1xx_HAL_Driver/Inc/Legacy \
+          -I Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc \
+          -I Middlewares/ST/STM32_USB_Device_Library/Core/Inc \
+          -I USB_DEVICE/App \
+          -I USB_DEVICE/Target \
+          -DUSE_HAL_DRIVER \
+          -DSTM32F103xB \
+          -D__GNUC__ \
+          --max-configs=1 \
+          Core/Src/ 2> cppcheck-report.xml || true
+
+    - name: Check Code Format
+      working-directory: mcu/chis_flash_burner
+      run: |
+        echo "Checking code formatting for specific source and header files..."
+        echo "================================================"
+        
+        # Define specific files to check
+        files_to_check=(
+          "Core/Src/main.c"
+          "Core/Src/uart.c" 
+          "Core/Src/cart_adapter.c"
+          "Core/Inc/main.h"
+          "Core/Inc/uart.h"
+          "Core/Inc/cart_adapter.h"
+        )
+        
+        total_files=${#files_to_check[@]}
+        echo "Checking $total_files specific source and header files"
+        echo
+        
+        # Check each file and collect results
+        issues_found=0
+        files_checked=0
+        
+        for file in "${files_to_check[@]}"; do
+          files_checked=$((files_checked + 1))
+          
+          if [ ! -f "$file" ]; then
+            echo "[$files_checked/$total_files] ⚠️  Warning: $file not found"
+            continue
+          fi
+          
+          echo "[$files_checked/$total_files] Checking $file..."
+          
+          if ! clang-format --dry-run --Werror "$file" >/dev/null 2>&1; then
+            echo "  ❌ Formatting issues found in $file"
+            issues_found=$((issues_found + 1))
+            # Show first few issues for this file
+            clang-format --dry-run "$file" 2>&1 | head -3 | sed 's/^/    /'
+          else
+            echo "  ✅ $file is properly formatted"
+          fi
+        done
+        
+        echo
+        echo "================================================"
+        echo "Code formatting check completed"
+        echo "Files checked: $total_files (specific source and header files)"
+        
+        # Note: This check is informational for now
+        echo "Note: Only checking Core/Src directory as requested"
+
+    - name: Upload Analysis Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: static-analysis-${{ github.sha }}
+        path: |
+          mcu/chis_flash_burner/cppcheck-report.xml
+        retention-days: 7

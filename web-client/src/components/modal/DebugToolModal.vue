@@ -1,0 +1,599 @@
+<template>
+  <BaseModal
+    v-model="localVisible"
+    :title="$t('ui.debug.tool.title')"
+    width="1200px"
+    max-width="95vw"
+    :mask-closable="false"
+    @close="$emit('close')"
+  >
+    <div class="debug-tool">
+      <div class="debug-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>{{ $t('ui.debug.tool.commandType') }}</label>
+            <select
+              v-model="selectedCommandType"
+              @change="onCommandTypeChange"
+            >
+              <option value="">
+                {{ $t('ui.debug.tool.selectCommandType') }}
+              </option>
+              <option value="GBA">
+                GBA
+              </option>
+              <option value="GBC">
+                GBC (MBC5)
+              </option>
+            </select>
+          </div>
+
+          <div
+            v-if="selectedCommandType"
+            class="form-group"
+          >
+            <label>{{ $t('ui.debug.tool.command') }}</label>
+            <select
+              v-model="selectedCommand"
+              @change="onCommandChange"
+            >
+              <option value="">
+                {{ $t('ui.debug.tool.selectCommand') }}
+              </option>
+              <option
+                v-for="(value, key) in availableCommands"
+                :key="key"
+                :value="value"
+              >
+                {{ getCommandDisplayName(key, value) }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div
+          v-if="selectedCommand"
+          class="form-row"
+        >
+          <div class="form-group">
+            <label>{{ $t('ui.debug.tool.address') }} ({{ $t('ui.debug.tool.optional') }})</label>
+            <input
+              v-model="address"
+              type="text"
+              :placeholder="$t('ui.debug.tool.addressPlaceholder')"
+            >
+          </div>
+
+          <div class="form-group">
+            <label>{{ $t('ui.debug.tool.length') }} ({{ $t('ui.debug.tool.optional') }})</label>
+            <input
+              v-model="length"
+              type="number"
+              min="1"
+              :placeholder="$t('ui.debug.tool.lengthPlaceholder')"
+            >
+          </div>
+        </div>
+
+        <div
+          v-if="selectedCommand"
+          class="form-row"
+        >
+          <div class="form-group">
+            <label>{{ $t('ui.debug.tool.receiveLength') }}</label>
+            <input
+              v-model="receiveLength"
+              type="number"
+              min="1"
+              max="8192"
+              :placeholder="$t('ui.debug.tool.receiveLengthPlaceholder')"
+            >
+            <small class="form-hint">{{ $t('ui.debug.tool.receiveLengthHint') }}</small>
+          </div>
+
+          <div class="form-group">
+            <label>{{ $t('ui.debug.tool.timeout') }} ({{ $t('ui.debug.tool.optional') }})</label>
+            <input
+              v-model="timeout"
+              type="number"
+              min="100"
+              :placeholder="$t('ui.debug.tool.timeoutPlaceholder')"
+            >
+            <small class="form-hint">{{ $t('ui.debug.tool.timeoutHint') }}</small>
+          </div>
+        </div>
+
+        <div
+          v-if="selectedCommand"
+          class="form-group"
+        >
+          <label>{{ $t('ui.debug.tool.data') }} ({{ $t('ui.debug.tool.optional') }})</label>
+          <textarea
+            v-model="data"
+            :placeholder="$t('ui.debug.tool.dataPlaceholder')"
+            rows="4"
+          />
+          <small class="form-hint">{{ $t('ui.debug.tool.dataHint') }}</small>
+        </div>
+
+        <div class="form-actions">
+          <BaseButton
+            variant="primary"
+            :icon="isSending ? hourglassOutline : sendOutline"
+            :text="isSending ? $t('ui.debug.tool.sending') : $t('ui.debug.tool.send')"
+            :disabled="!canSend || isSending"
+            @click="sendCommand"
+          />
+
+          <BaseButton
+            variant="secondary"
+            :icon="refreshOutline"
+            :text="$t('ui.debug.tool.clear')"
+            @click="clearForm"
+          />
+        </div>
+      </div>
+
+      <div class="debug-output">
+        <div class="output-section">
+          <h4>{{ $t('ui.debug.tool.request') }}</h4>
+          <div class="data-display">
+            <div
+              v-if="requestData"
+              class="data-hex"
+            >
+              {{ formatHexData(requestData) }}
+            </div>
+            <div
+              v-else
+              class="data-placeholder"
+            >
+              {{ $t('ui.debug.tool.noRequestData') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="output-section">
+          <h4>{{ $t('ui.debug.tool.response') }}</h4>
+          <div class="data-display">
+            <div
+              v-if="responseData"
+              class="data-hex"
+            >
+              {{ formatHexData(responseData) }}
+            </div>
+            <div
+              v-else-if="errorMessage"
+              class="data-error"
+            >
+              <IonIcon :icon="alertCircleOutline" />
+              {{ errorMessage }}
+            </div>
+            <div
+              v-else
+              class="data-placeholder"
+            >
+              {{ $t('ui.debug.tool.noResponseData') }}
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="responseData"
+          class="output-section"
+        >
+          <h4>{{ $t('ui.debug.tool.analysis') }}</h4>
+          <div class="analysis-display">
+            <div class="analysis-item">
+              <span class="label">{{ $t('ui.debug.tool.responseLength') }}:</span>
+              <span class="value">{{ responseData.length }} {{ $t('ui.debug.tool.bytes') }}</span>
+            </div>
+            <div class="analysis-item">
+              <span class="label">{{ $t('ui.debug.tool.executionTime') }}:</span>
+              <span class="value">{{ executionTime }}ms</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </BaseModal>
+</template>
+
+<script setup lang="ts">
+import { IonIcon } from '@ionic/vue';
+import {
+  alertCircleOutline,
+  hourglassOutline,
+  refreshOutline,
+  sendOutline,
+} from 'ionicons/icons';
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+
+import BaseButton from '@/components/common/BaseButton.vue';
+import BaseModal from '@/components/common/BaseModal.vue';
+import { useToast } from '@/composables/useToast';
+import {
+  type DebugCommandType,
+  executeDebugCommand,
+  getAvailableDebugCommands,
+  isDuplicatedDebugCommandName,
+} from '@/services/debug-protocol-service';
+import type { DeviceInfo } from '@/types/device-info';
+
+const props = defineProps<{
+  modelValue: boolean;
+  device?: DeviceInfo | null;
+}>();
+
+const emit = defineEmits<{
+  'update:modelValue': [value: boolean];
+  close: [];
+}>();
+
+const { t } = useI18n();
+const { showToast } = useToast();
+
+// 创建一个计算属性来处理 v-model
+const localVisible = computed({
+  get: () => props.modelValue,
+  set: (value: boolean) => {
+    emit('update:modelValue', value);
+  },
+});
+
+const selectedCommandType = ref<DebugCommandType | ''>('');
+const selectedCommand = ref<number | ''>('');
+const address = ref('');
+const length = ref<number | ''>('');
+const data = ref('');
+const receiveLength = ref<number | ''>('');
+const timeout = ref<number | ''>('');
+
+const requestData = ref<Uint8Array | null>(null);
+const responseData = ref<Uint8Array | null>(null);
+const errorMessage = ref('');
+const executionTime = ref(0);
+const isSending = ref(false);
+
+const availableCommands = computed(() => {
+  return getAvailableDebugCommands(selectedCommandType.value);
+});
+
+const canSend = computed(() => {
+  return selectedCommandType.value && selectedCommand.value !== '' && receiveLength.value !== '';
+});
+
+// 根据命令设置默认接收长度
+function setDefaultReceiveLength(command: number, commandType: 'GBA' | 'GBC') {
+  if (commandType === 'GBA') {
+    switch (command) {
+      case 0xf0: // READ_ID
+        receiveLength.value = 10; // 2 bytes CRC + 8 bytes ID
+        break;
+      case 0xf1: // ERASE_CHIP
+      case 0xf2: // BLOCK_ERASE
+      case 0xf3: // SECTOR_ERASE
+      case 0xf4: // PROGRAM
+      case 0xf5: // DIRECT_WRITE
+      case 0xf7: // RAM_WRITE
+      case 0xf9: // RAM_WRITE_TO_FLASH
+        receiveLength.value = 1; // 1 byte result (0xaa or other)
+        break;
+      case 0xf6: // READ
+      case 0xf8: // RAM_READ
+        // 对于读取命令，默认长度取决于用户输入的length + 2 bytes CRC
+        // 如果没有输入length，则设置一个合理的默认值
+        const defaultReadLength = length.value !== '' ? length.value + 2 : 258; // 256 bytes + 2 CRC
+        receiveLength.value = defaultReadLength;
+        break;
+      default:
+        receiveLength.value = 64; // 默认64字节
+    }
+  } else if (commandType === 'GBC') {
+    switch (command) {
+      case 0xfa: // DIRECT_WRITE
+      case 0xfc: // ROM_PROGRAM
+        receiveLength.value = 1; // 1 byte result (0xaa or other)
+        break;
+      case 0xfb: // READ
+        // 对于读取命令，默认长度取决于用户输入的length + 2 bytes CRC
+        const defaultReadLength = length.value !== '' ? length.value + 2 : 258; // 256 bytes + 2 CRC
+        receiveLength.value = defaultReadLength;
+        break;
+      default:
+        receiveLength.value = 64; // 默认64字节
+    }
+  }
+}
+
+function onCommandTypeChange() {
+  selectedCommand.value = '';
+  receiveLength.value = '';
+  clearOutput();
+}
+
+function onCommandChange() {
+  if (typeof selectedCommand.value === 'number' && selectedCommandType.value) {
+    setDefaultReceiveLength(selectedCommand.value, selectedCommandType.value);
+  }
+}
+
+function clearForm() {
+  selectedCommandType.value = '';
+  selectedCommand.value = '';
+  address.value = '';
+  length.value = '';
+  data.value = '';
+  receiveLength.value = '';
+  timeout.value = '';
+  clearOutput();
+}
+
+function clearOutput() {
+  requestData.value = null;
+  responseData.value = null;
+  errorMessage.value = '';
+  executionTime.value = 0;
+}
+
+function getCommandDisplayName(key: string, value: number): string {
+  const hexValue = '0x' + value.toString(16).toUpperCase().padStart(2, '0');
+
+  // 如果有重复，添加类型前缀进行区分
+  if (isDuplicatedDebugCommandName(key)) {
+    return `${selectedCommandType.value}_${key} (${hexValue})`;
+  }
+
+  return `${key} (${hexValue})`;
+}
+
+function parseHexString(hexStr: string): Uint8Array {
+  const cleaned = hexStr.replace(/[^0-9a-fA-F]/g, '');
+  if (cleaned.length % 2 !== 0) {
+    throw new Error(t('ui.debug.tool.errors.invalidHexLength'));
+  }
+
+  const bytes = new Uint8Array(cleaned.length / 2);
+  for (let i = 0; i < cleaned.length; i += 2) {
+    bytes[i / 2] = parseInt(cleaned.slice(i, i + 2), 16);
+  }
+  return bytes;
+}
+
+function parseAddress(addrStr: string): number | null {
+  if (!addrStr.trim()) return null;
+
+  const cleaned = addrStr.trim();
+  if (cleaned.startsWith('0x') || cleaned.startsWith('0X')) {
+    return parseInt(cleaned, 16);
+  } else if (/^[0-9a-fA-F]+$/.test(cleaned)) {
+    return parseInt(cleaned, 16);
+  } else {
+    return parseInt(cleaned, 10);
+  }
+}
+
+async function sendCommand() {
+  if (!canSend.value) return;
+
+  // 获取当前连接的设备
+  const device = props.device;
+  if (!device) {
+    showToast(t('ui.debug.tool.errors.noDevice'), 'error');
+    return;
+  }
+
+  isSending.value = true;
+  clearOutput();
+
+  try {
+    const startTime = performance.now();
+
+    const parsedAddress = parseAddress(address.value);
+    let dataBytes: Uint8Array | null = null;
+    if (data.value.trim()) {
+      try {
+        dataBytes = parseHexString(data.value);
+      } catch (error) {
+        throw new Error(t('ui.debug.tool.errors.invalidHexData'));
+      }
+    }
+
+    const maxResponseLength = receiveLength.value !== '' ? receiveLength.value : 4096;
+    const timeoutMs = timeout.value !== '' ? timeout.value : undefined;
+    if (typeof selectedCommand.value !== 'number') {
+      throw new Error(t('ui.debug.tool.errors.commandFailed'));
+    }
+
+    const transport = device.transport ?? device.serialHandle?.transport;
+    if (!transport) {
+      throw new Error(t('ui.debug.tool.errors.noDevice'));
+    }
+
+    const result = await executeDebugCommand({
+      transport,
+      command: selectedCommand.value,
+      address: parsedAddress,
+      length: length.value === '' ? null : length.value,
+      data: dataBytes,
+      receiveLength: maxResponseLength,
+      timeoutMs,
+    });
+    requestData.value = result.requestData;
+    responseData.value = result.responseData;
+
+    const endTime = performance.now();
+    executionTime.value = Math.round(endTime - startTime);
+
+    showToast(t('ui.debug.tool.commandSent'), 'success');
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+    showToast(t('ui.debug.tool.errors.commandFailed'), 'error');
+  } finally {
+    isSending.value = false;
+  }
+}
+
+function formatHexData(hexData: Uint8Array): string {
+  const hexString = Array.from(hexData)
+    .map(byte => byte.toString(16).toUpperCase().padStart(2, '0'))
+    .join(' ');
+
+  // 每16字节换行
+  const lines = [];
+  for (let i = 0; i < hexString.length; i += 48) { // 16 * 3 - 1 = 47 + 1 = 48
+    lines.push(hexString.slice(i, i + 47));
+  }
+  return lines.join('\n');
+}
+</script>
+
+<style lang="scss" scoped>
+@use '@/styles/variables/colors' as color-vars;
+@use '@/styles/variables/spacing' as spacing-vars;
+@use '@/styles/variables/typography' as typography-vars;
+@use '@/styles/variables/radius' as radius-vars;
+@use '@/styles/mixins' as mixins;
+
+.debug-tool {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: spacing-vars.$space-6;
+  min-height: 400px;
+}
+
+.debug-form {
+  @include mixins.flex-column;
+  gap: spacing-vars.$space-5;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: spacing-vars.$space-4;
+}
+
+.form-group {
+  @include mixins.flex-column;
+  gap: spacing-vars.$space-2;
+
+  label {
+    font-weight: typography-vars.$font-weight-semibold;
+    color: color-vars.$color-text;
+    font-size: typography-vars.$font-size-sm;
+  }
+
+  select,
+  input,
+  textarea {
+    padding: spacing-vars.$space-3;
+    border: 1px solid color-vars.$color-border;
+    border-radius: radius-vars.$radius-base;
+    font-size: typography-vars.$font-size-sm;
+    font-family: 'Fira Code', 'Monaco', monospace;
+
+    &:focus {
+      outline: none;
+      border-color: color-vars.$color-primary;
+      box-shadow: color-vars.$shadow-sm;
+    }
+  }
+}
+
+.form-hint {
+  color: color-vars.$color-text-secondary;
+  font-size: typography-vars.$font-size-xs;
+  margin-top: spacing-vars.$space-1;
+}
+
+.form-actions {
+  display: flex;
+  gap: spacing-vars.$space-3;
+  margin-top: auto;
+}
+
+.debug-output {
+  @include mixins.flex-column;
+  gap: spacing-vars.$space-5;
+}
+
+.output-section {
+  background: color-vars.$color-bg-secondary;
+  border: 1px solid color-vars.$color-border;
+  border-radius: radius-vars.$radius-lg;
+  overflow: hidden;
+
+  h4 {
+    margin: 0;
+    padding: spacing-vars.$space-3 spacing-vars.$space-4;
+    background: color-vars.$color-bg-tertiary;
+    border-bottom: 1px solid color-vars.$color-border;
+    font-size: typography-vars.$font-size-sm;
+    font-weight: typography-vars.$font-weight-semibold;
+    color: color-vars.$color-text;
+  }
+}
+
+.data-display {
+  padding: spacing-vars.$space-4;
+  min-height: 100px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.data-hex {
+  font-family: 'Fira Code', 'Monaco', monospace;
+  font-size: typography-vars.$font-size-xs;
+  line-height: typography-vars.$line-height-normal;
+  white-space: pre;
+  color: color-vars.$color-text;
+  background: color-vars.$color-bg;
+  padding: spacing-vars.$space-3;
+  border-radius: radius-vars.$radius-sm;
+  border: 1px solid color-vars.$color-border;
+}
+
+.data-placeholder {
+  @include mixins.flex-center;
+  color: color-vars.$color-text-secondary;
+  font-style: italic;
+  height: 68px;
+}
+
+.data-error {
+  display: flex;
+  align-items: center;
+  gap: spacing-vars.$space-2;
+  color: color-vars.$color-error;
+  background: color-vars.$color-error-light;
+  padding: spacing-vars.$space-3;
+  border-radius: radius-vars.$radius-sm;
+  border: 1px solid color-vars.$color-error-light;
+}
+
+.analysis-display {
+  padding: spacing-vars.$space-4;
+}
+
+.analysis-item {
+  @include mixins.flex-between;
+  padding: spacing-vars.$space-2 0;
+  border-bottom: 1px solid color-vars.$color-border-light;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .label {
+    font-weight: typography-vars.$font-weight-medium;
+    color: color-vars.$color-text;
+  }
+
+  .value {
+    font-family: 'Fira Code', 'Monaco', monospace;
+    color: color-vars.$color-text;
+    font-weight: typography-vars.$font-weight-semibold;
+  }
+}
+</style>
