@@ -159,6 +159,7 @@ import type { BurnerLogEntry } from '@/types/burner-log';
 import type { MbcType, RamType as CartRamType } from '@/types/command-options';
 import { getFirmwareProfile, inferFirmwareProfileFromPort } from '@/types/firmware-profile';
 import { formatBytes, formatHex } from '@/utils/formatter-utils';
+import { createReadOnlyCartInfo, GBA_MAX_ROM_SIZE, GBA_ROM_SIZE_CANDIDATES, isRomEnd, ROM_END_PROBE_SIZE } from '@/utils/gba-rom-size';
 import { detectGbaSaveType, type GbaSaveType, trimErasedRomTail } from '@/utils/gba-save-type';
 import { CFIInfo } from '@/utils/parsers/cfi-parser';
 import { detectMbcTypeFromRom, parseRom } from '@/utils/parsers/rom-parser.ts';
@@ -175,12 +176,14 @@ interface CartPlaySession {
   saveSize: number;
   /** Cartridge RAM type used to sync the save; null when it cannot be synced. */
   ramType: CartRamType | null;
+  cartInfo: CFIInfo;
 }
 
 interface PendingCartSave {
   data: Uint8Array;
   name: string;
   ramType: CartRamType;
+  cartInfo: CFIInfo;
 }
 
 const { showToast } = useToast();
@@ -1062,12 +1065,39 @@ function resolveCartRamType(saveType: GbaSaveType): CartRamType | null {
   }
 }
 
+/** Smallest candidate size where the ROM mirrors or the bus floats, else maxSize. */
+async function detectRomSize(
+  adapter: BurnerProtocolSession,
+  options: CommandOptions,
+  maxSize: number,
+  signal?: AbortSignal,
+): Promise<number | null> {
+  const base = options.baseAddress ?? 0;
+  const head = await burnerFacade.readRom(adapter, ROM_END_PROBE_SIZE, options, signal, false);
+  if (!head.success || !head.data) {
+    showToast(head.message, 'error');
+    return null;
+  }
+  for (const candidate of GBA_ROM_SIZE_CANDIDATES) {
+    if (candidate >= maxSize) break;
+    const probe = await burnerFacade.readRom(adapter, ROM_END_PROBE_SIZE, { ...options, baseAddress: base + candidate }, signal, false);
+    if (probe.success && probe.data && isRomEnd(probe.data, head.data, base + candidate)) {
+      return candidate;
+    }
+  }
+  return maxSize;
+}
+
 async function readCartridgeRom(
   adapter: BurnerProtocolSession,
   options: CommandOptions,
+  maxSize: number,
   signal?: AbortSignal,
 ): Promise<Uint8Array | null> {
-  const response = await burnerFacade.readRom(adapter, parseInt(selectedRomSize.value, 16), options, signal);
+  const size = await detectRomSize(adapter, options, maxSize, signal);
+  if (!size) return null;
+  log(t('messages.play.romSize', { size: formatBytes(size) }), 'info');
+  const response = await burnerFacade.readRom(adapter, size, options, signal);
   if (!response.success || !response.data) {
     showToast(response.message, 'error');
     return null;
@@ -1090,28 +1120,32 @@ async function playFromCartridge() {
       }
 
       await withCommandBufferReset(adapter, async () => {
-        if (!cfiInfo.value) {
+        let cartInfo = cfiInfo.value;
+        if (!cartInfo) {
           const cart = await burnerFacade.readCart(adapter, false);
-          if (!cart.success || !cart.cfiInfo) {
-            showToast(cart.message, 'error');
-            log(cart.message, 'error');
-            return;
-          }
-          cfiInfo.value = cart.cfiInfo;
-          chipId.value = cart.chipId;
-          if (cart.romSizeHex) {
-            onRomSizeChange(cart.romSizeHex);
+          if (cart.success && cart.cfiInfo) {
+            cartInfo = cart.cfiInfo;
+            cfiInfo.value = cart.cfiInfo;
+            chipId.value = cart.chipId;
+            if (cart.romSizeHex) {
+              onRomSizeChange(cart.romSizeHex);
+            }
+          } else {
+            // Original cartridges have no flash chip to identify; they can still be read.
+            log(t('messages.play.readOnlyCart'), 'info');
+            cartInfo = createReadOnlyCartInfo();
           }
         }
 
         const options: CommandOptions = {
           baseAddress: parseInt(selectedBaseAddress.value, 16),
-          cfiInfo: cfiInfo.value,
+          cfiInfo: cartInfo,
           mbcType: selectedMbcType.value,
           enable5V: false,
         };
 
-        const rom = await readCartridgeRom(adapter, options, signal);
+        const maxSize = cartInfo.cfiDetected ? parseInt(selectedRomSize.value, 16) : GBA_MAX_ROM_SIZE;
+        const rom = await readCartridgeRom(adapter, options, maxSize, signal);
         if (!rom) return;
 
         const info = parseRom(rom);
@@ -1145,6 +1179,7 @@ async function playFromCartridge() {
           save,
           saveSize: saveType.size,
           ramType,
+          cartInfo,
         };
       });
     },
@@ -1175,8 +1210,8 @@ async function writeSaveNow(pending: PendingCartSave): Promise<boolean> {
   await executeOperation({
     operation: async () => {
       const adapter = getAdapter();
-      if (!adapter || !cfiInfo.value) return;
-      const currentCfiInfo = cfiInfo.value;
+      if (!adapter) return;
+      const currentCfiInfo = pending.cartInfo;
 
       await withCommandBufferReset(adapter, async () => {
         const response = await burnerFacade.writeRam(adapter, pending.data, {
@@ -1214,7 +1249,7 @@ function toCartSave(session: CartPlaySession, data: Uint8Array): PendingCartSave
   if (!session.ramType) return null;
   const sized = new Uint8Array(session.saveSize).fill(0xFF);
   sized.set(data.subarray(0, sized.length));
-  return { data: sized, name: session.name, ramType: session.ramType };
+  return { data: sized, name: session.name, ramType: session.ramType, cartInfo: session.cartInfo };
 }
 
 async function onSaveToCartridge(data: Uint8Array) {

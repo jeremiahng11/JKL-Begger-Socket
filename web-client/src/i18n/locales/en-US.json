@@ -932,7 +932,9 @@
       "started": "Playing {name} from the cartridge",
       "saveWritten": "Game progress saved to the cartridge",
       "saveWriteFailed": "Could not save game progress to the cartridge",
-      "saveUnchanged": "No new progress to save"
+      "saveUnchanged": "No new progress to save",
+      "readOnlyCart": "No flash chip detected, so this looks like an original cartridge. Reading it directly.",
+      "romSize": "Game size on the cartridge: {size}"
     }
   }
 }
