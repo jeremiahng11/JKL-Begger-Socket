@@ -633,6 +633,17 @@
       "imagePreview": "Image Preview",
       "originalImage": "Original Image",
       "processedImage": "Processed Image"
+    },
+    "play": {
+      "title": "Play from Cartridge",
+      "hint": "Reads the game and its save from the cartridge, then plays it here. Your progress is written back to the cartridge, so you can continue on Android or a real Game Boy Advance.",
+      "useCache": "Reuse ROM read earlier",
+      "start": "Play",
+      "saveToCart": "Save to cartridge",
+      "saving": "Saving…",
+      "pendingSave": "Game progress has not been written to the cartridge yet.",
+      "retrySave": "Write save to cartridge",
+      "downloadSave": "Download .sav"
     }
   },
   "messages": {
@@ -911,6 +922,19 @@
       "romDownloaded": "ROM downloaded",
       "romApplied": "ROM applied to main page",
       "romDownloadFailed": "ROM download failed: {error}"
+    },
+    "play": {
+      "notGba": "The cartridge does not contain a valid GBA game",
+      "cacheHit": "Using the ROM read earlier for this cartridge",
+      "saveType": "Save type: {kind} ({size}), cartridge RAM type: {ramType}",
+      "noSave": "This game does not use save data",
+      "eepromUnsupported": "This game uses EEPROM saves, which the burner cannot read or write. Progress will not be saved to the cartridge.",
+      "batlessUnsupported": "Batteryless saves are not synced while playing. Progress will not be saved to the cartridge.",
+      "saveReadFailed": "Could not read the save from the cartridge, so the game was not started to protect your save",
+      "started": "Playing {name} from the cartridge",
+      "saveWritten": "Game progress saved to the cartridge",
+      "saveWriteFailed": "Could not save game progress to the cartridge",
+      "saveUnchanged": "No new progress to save"
     }
   }
 }

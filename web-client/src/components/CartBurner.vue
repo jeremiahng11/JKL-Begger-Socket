@@ -1,5 +1,17 @@
 <template>
   <div class="flashburner-container">
+    <Suspense v-if="cartPlay">
+      <GBAEmulator
+        :is-visible="true"
+        :rom-data="cartPlay.rom"
+        :rom-name="cartPlay.name"
+        :save-data="cartPlay.save"
+        :cartridge-sync="cartPlay.ramType !== null"
+        :saving-to-cartridge="savingToCartridge"
+        @save-to-cartridge="onSaveToCartridge"
+        @close="onCartPlayClose"
+      />
+    </Suspense>
     <ProgressDisplayModal
       key="progress"
       v-model="showProgressModal"
@@ -56,6 +68,18 @@
             @read-rom-info="readRomInfo"
             @mbc-type-change="(value: string) => selectedMbcType = value as MbcType"
             @mbc-power-change="mbcPower5V = $event"
+          />
+
+          <PlayOperations
+            v-if="mode === 'GBA'"
+            key="play-operations"
+            v-model:use-rom-cache="useRomCache"
+            :device-ready="deviceReady"
+            :busy="busy"
+            :has-pending-save="pendingCartSave !== null"
+            @play="playFromCartridge"
+            @retry-save="retryPendingSave"
+            @download-save="downloadPendingSave"
           />
 
           <RomOperations
@@ -115,7 +139,7 @@
 <script setup lang="ts">
 import { gameControllerOutline, hardwareChipOutline } from 'ionicons/icons';
 import { DateTime } from 'luxon';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import BaseButton from '@/components/common/BaseButton.vue';
@@ -123,7 +147,7 @@ import LogViewer from '@/components/LogViewer.vue';
 import FileNameSelectorModal from '@/components/modal/FileNameSelectorModal.vue';
 import MultiCartResultModal from '@/components/modal/MultiCartResultModal.vue';
 import ProgressDisplayModal from '@/components/modal/ProgressDisplayModal.vue';
-import { ChipOperations, RamOperations, RomOperations } from '@/components/operaiton';
+import { ChipOperations, PlayOperations, RamOperations, RomOperations } from '@/components/operaiton';
 import { runWithCommandBufferReset, useCartBurnerFileState, useCartBurnerSessionState } from '@/composables/cartburner';
 import { useToast } from '@/composables/useToast';
 import { createCartridgeProtocolSession } from '@/features/burner/adapters';
@@ -133,14 +157,33 @@ import { AdvancedSettings } from '@/settings/advanced-settings';
 import { useRecentFileNamesStore } from '@/stores/recent-file-names-store';
 import { CommandOptions, DeviceInfo } from '@/types';
 import type { BurnerLogEntry } from '@/types/burner-log';
-import type { MbcType } from '@/types/command-options';
+import type { MbcType, RamType as CartRamType } from '@/types/command-options';
 import { getFirmwareProfile, inferFirmwareProfileFromPort } from '@/types/firmware-profile';
 import { formatBytes, formatHex } from '@/utils/formatter-utils';
+import { detectGbaSaveType, type GbaSaveType, trimErasedRomTail } from '@/utils/gba-save-type';
 import { CFIInfo } from '@/utils/parsers/cfi-parser';
 import { detectMbcTypeFromRom, parseRom } from '@/utils/parsers/rom-parser.ts';
+import { getCachedRom, putCachedRom, ROM_FINGERPRINT_SIZE, romFingerprint } from '@/utils/rom-cache';
+
+const GBAEmulator = defineAsyncComponent(() => import('@/components/emulator/GBAEmulator.vue'));
 
 type ModeType = 'GBA' | 'MBC5';
 type RamType = 'SRAM' | 'FLASH';
+
+interface CartPlaySession {
+  rom: Uint8Array;
+  name: string;
+  save: Uint8Array | null;
+  saveSize: number;
+  /** Cartridge RAM type used to sync the save; null when it cannot be synced. */
+  ramType: CartRamType | null;
+}
+
+interface PendingCartSave {
+  data: Uint8Array;
+  name: string;
+  ramType: CartRamType;
+}
 
 const { showToast } = useToast();
 const { t } = useI18n();
@@ -979,6 +1022,261 @@ function logDeviceFirmwareProfile(deviceInfo: DeviceInfo) {
     details,
   }, profile.id === 'unknown' ? 'warn' : 'info');
 }
+
+// Play from cartridge: read the ROM and save off the cartridge, run them in
+// the emulator, and write the save back so progress stays on the cartridge.
+const useRomCache = ref(true);
+const cartPlay = shallowRef<CartPlaySession | null>(null);
+const savingToCartridge = ref(false);
+const pendingCartSave = shallowRef<PendingCartSave | null>(null);
+let lastSyncedSave: Uint8Array | null = null;
+
+function sameBytes(a: Uint8Array | null, b: Uint8Array | null): boolean {
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function resolveCartRamType(saveType: GbaSaveType): CartRamType | null {
+  switch (saveType.kind) {
+    case 'NONE':
+      log(t('messages.play.noSave'), 'info');
+      return null;
+    case 'EEPROM':
+      log(t('messages.play.eepromUnsupported'), 'warn');
+      showToast(t('messages.play.eepromUnsupported'), 'info');
+      return null;
+    case 'FLASH512':
+    case 'FLASH1M':
+      return 'FLASH';
+    case 'SRAM':
+      if (selectedRamType.value === 'BATLESS') {
+        log(t('messages.play.batlessUnsupported'), 'warn');
+        showToast(t('messages.play.batlessUnsupported'), 'info');
+        return null;
+      }
+      return selectedRamType.value === 'FRAM' ? 'FRAM' : 'SRAM';
+  }
+}
+
+async function readCartridgeRom(
+  adapter: BurnerProtocolSession,
+  options: CommandOptions,
+  signal?: AbortSignal,
+): Promise<Uint8Array | null> {
+  let cacheKey: string | null = null;
+  if (useRomCache.value) {
+    const head = await burnerFacade.readRom(adapter, ROM_FINGERPRINT_SIZE, options, signal, false);
+    if (!head.success || !head.data) {
+      showToast(head.message, 'error');
+      return null;
+    }
+    cacheKey = await romFingerprint(head.data, options.baseAddress ?? 0);
+    const cached = await getCachedRom(cacheKey);
+    if (cached) {
+      log(t('messages.play.cacheHit'), 'info');
+      return cached;
+    }
+  }
+
+  const response = await burnerFacade.readRom(adapter, parseInt(selectedRomSize.value, 16), options, signal);
+  if (!response.success || !response.data) {
+    showToast(response.message, 'error');
+    return null;
+  }
+  const rom = trimErasedRomTail(response.data);
+  if (cacheKey) {
+    await putCachedRom(cacheKey, rom, parseRom(rom).title);
+  }
+  return rom;
+}
+
+async function playFromCartridge() {
+  const result: { session?: CartPlaySession } = {};
+
+  await executeOperation({
+    cancellable: true,
+    resetProgressOnFinish: true,
+    updateProgress: { progress: 0 },
+    operation: async (signal) => {
+      const adapter = getAdapter();
+      if (!adapter) {
+        resetProgress();
+        return;
+      }
+
+      await withCommandBufferReset(adapter, async () => {
+        if (!cfiInfo.value) {
+          const cart = await burnerFacade.readCart(adapter, false);
+          if (!cart.success || !cart.cfiInfo) {
+            showToast(cart.message, 'error');
+            log(cart.message, 'error');
+            return;
+          }
+          cfiInfo.value = cart.cfiInfo;
+          chipId.value = cart.chipId;
+          if (cart.romSizeHex) {
+            onRomSizeChange(cart.romSizeHex);
+          }
+        }
+
+        const options: CommandOptions = {
+          baseAddress: parseInt(selectedBaseAddress.value, 16),
+          cfiInfo: cfiInfo.value,
+          mbcType: selectedMbcType.value,
+          enable5V: false,
+        };
+
+        const rom = await readCartridgeRom(adapter, options, signal);
+        if (!rom) return;
+
+        const info = parseRom(rom);
+        if (info.type !== 'GBA') {
+          showToast(t('messages.play.notGba'), 'error');
+          log(t('messages.play.notGba'), 'error');
+          return;
+        }
+
+        const saveType = detectGbaSaveType(rom);
+        const ramType = resolveCartRamType(saveType);
+        let save: Uint8Array | null = null;
+        if (ramType) {
+          log(t('messages.play.saveType', { kind: saveType.kind, size: formatBytes(saveType.size), ramType }), 'info');
+          const saveResult = await burnerFacade.readRam(adapter, saveType.size, {
+            ...options,
+            ramType,
+            baseAddress: 0,
+          });
+          if (!saveResult.success || !saveResult.data) {
+            showToast(t('messages.play.saveReadFailed'), 'error');
+            log(`${t('messages.play.saveReadFailed')}: ${saveResult.message}`, 'error');
+            return;
+          }
+          save = saveResult.data;
+        }
+
+        result.session = {
+          rom,
+          name: info.title || 'GBA',
+          save,
+          saveSize: saveType.size,
+          ramType,
+        };
+      });
+    },
+    onError: (error) => {
+      showToast(t('messages.rom.readFailed'), 'error');
+      log(`${t('messages.rom.readFailed')}: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    },
+  });
+
+  if (result.session) {
+    lastSyncedSave = result.session.save;
+    cartPlay.value = result.session;
+    log(t('messages.play.started', { name: result.session.name }), 'success');
+  }
+}
+
+async function writeSaveToCartridge(pending: PendingCartSave): Promise<boolean> {
+  const outcome = { ok: false };
+  savingToCartridge.value = true;
+
+  await executeOperation({
+    operation: async () => {
+      const adapter = getAdapter();
+      if (!adapter || !cfiInfo.value) return;
+      const currentCfiInfo = cfiInfo.value;
+
+      await withCommandBufferReset(adapter, async () => {
+        const response = await burnerFacade.writeRam(adapter, pending.data, {
+          ramType: pending.ramType,
+          baseAddress: 0,
+          cfiInfo: currentCfiInfo,
+          mbcType: selectedMbcType.value,
+          enable5V: false,
+        });
+        outcome.ok = response.success;
+        if (!response.success) {
+          log(`${t('messages.play.saveWriteFailed')}: ${response.message}`, 'error');
+        }
+      });
+    },
+    onError: (error) => {
+      log(`${t('messages.play.saveWriteFailed')}: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    },
+  });
+
+  savingToCartridge.value = false;
+  if (outcome.ok) {
+    lastSyncedSave = pending.data;
+    pendingCartSave.value = null;
+    showToast(t('messages.play.saveWritten'), 'success');
+    log(t('messages.play.saveWritten'), 'success');
+  } else {
+    pendingCartSave.value = pending;
+    showToast(t('messages.play.saveWriteFailed'), 'error');
+  }
+  return outcome.ok;
+}
+
+function toCartSave(session: CartPlaySession, data: Uint8Array): PendingCartSave | null {
+  if (!session.ramType) return null;
+  const sized = new Uint8Array(session.saveSize).fill(0xFF);
+  sized.set(data.subarray(0, sized.length));
+  return { data: sized, name: session.name, ramType: session.ramType };
+}
+
+async function onSaveToCartridge(data: Uint8Array) {
+  const session = cartPlay.value;
+  const pending = session ? toCartSave(session, data) : null;
+  if (!pending) return;
+  if (sameBytes(pending.data, lastSyncedSave)) {
+    showToast(t('messages.play.saveUnchanged'), 'info');
+    return;
+  }
+  await writeSaveToCartridge(pending);
+}
+
+async function onCartPlayClose(finalSave: Uint8Array | null) {
+  const session = cartPlay.value;
+  cartPlay.value = null;
+  if (!session || !finalSave) return;
+  const pending = toCartSave(session, finalSave);
+  if (pending && !sameBytes(pending.data, lastSyncedSave)) {
+    await writeSaveToCartridge(pending);
+  }
+}
+
+async function retryPendingSave() {
+  if (pendingCartSave.value) {
+    await writeSaveToCartridge(pendingCartSave.value);
+  }
+}
+
+async function downloadPendingSave() {
+  const pending = pendingCartSave.value;
+  if (!pending) return;
+  const result = await saveAsFile(pending.data, `${pending.name}.sav`);
+  if (result.saved) {
+    log(t('messages.ram.exportSuccess', { name: `${pending.name}.sav` }), 'success');
+  }
+}
+
+function warnUnsavedProgress(event: BeforeUnloadEvent) {
+  if (cartPlay.value?.ramType || pendingCartSave.value) {
+    event.preventDefault();
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', warnUnsavedProgress);
+});
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', warnUnsavedProgress);
+});
 
 // 暴露方法供父组件调用
 defineExpose({

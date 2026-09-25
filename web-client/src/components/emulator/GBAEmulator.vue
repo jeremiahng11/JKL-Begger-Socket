@@ -2,7 +2,7 @@
   <div
     v-if="isVisible"
     class="emulator-overlay"
-    @click.self="closeEmulator"
+    @click.self="!cartridgeSync && closeEmulator()"
   >
     <div class="emulator-container">
       <div class="emulator-header">
@@ -10,6 +10,16 @@
           {{ $t('ui.emulator.title') }} - {{ romName }}
         </h3>
         <div class="emulator-controls">
+          <BaseButton
+            v-if="cartridgeSync"
+            variant="success"
+            size="sm"
+            :icon="saveOutline"
+            :text="savingToCartridge ? $t('ui.play.saving') : $t('ui.play.saveToCart')"
+            :disabled="savingToCartridge || hasError"
+            :title="$t('ui.play.saveToCart')"
+            @click="saveToCartridge"
+          />
           <BaseButton
             variant="secondary"
             size="sm"
@@ -86,7 +96,7 @@
 <script setup lang="ts">
 import { IonIcon } from '@ionic/vue';
 import { Wrapper } from 'gbats';
-import { close, pause, play, refresh, warning } from 'ionicons/icons';
+import { close, pause, play, refresh, saveOutline, warning } from 'ionicons/icons';
 import { nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
@@ -100,10 +110,16 @@ const props = defineProps<{
   isVisible: boolean;
   romData: Uint8Array | null;
   romName: string;
+  /** Save data to load into the game, e.g. read from the cartridge. */
+  saveData?: Uint8Array | null;
+  /** Show the "save to cartridge" control and hand the save back on close. */
+  cartridgeSync?: boolean;
+  savingToCartridge?: boolean;
 }>();
 
 const emit = defineEmits<{
-  close: [];
+  close: [saveData: Uint8Array | null];
+  'save-to-cartridge': [saveData: Uint8Array];
 }>();
 
 const gameCanvas = useTemplateRef<HTMLCanvasElement>('gameCanvas');
@@ -265,6 +281,10 @@ function initializeEmulator() {
     if (!gba.value) {
       throw new Error(t('ui.emulator.errors.createInstanceFailed'));
     }
+
+    // The emulator's first frame runs on a timer, so the save is in place
+    // before the game reads it.
+    applySaveData(props.saveData ?? null);
 
     // 设置错误处理器
     setupErrorHandling();
@@ -531,14 +551,48 @@ function togglePause() {
   }
 }
 
+interface SaveMemory {
+  buffer: ArrayBuffer;
+}
+
+function getSaveMemory(): SaveMemory | null {
+  const mmu = gba.value?.emulator.mmu as unknown as { save?: SaveMemory | null } | undefined;
+  return mmu?.save ?? null;
+}
+
+function applySaveData(data: Uint8Array | null) {
+  const save = getSaveMemory();
+  if (!data || !save || !gba.value) return;
+
+  // The emulator addresses the save through views sized to its own buffer,
+  // so the incoming data must match that length exactly.
+  const sized = new Uint8Array(save.buffer.byteLength).fill(0xFF);
+  sized.set(data.subarray(0, sized.length));
+  gba.value.emulator.setSavedata(sized.buffer);
+}
+
+function snapshotSaveData(): Uint8Array | null {
+  const save = getSaveMemory();
+  return save ? new Uint8Array(save.buffer.slice(0)) : null;
+}
+
+function saveToCartridge() {
+  const snapshot = snapshotSaveData();
+  if (snapshot) {
+    emit('save-to-cartridge', snapshot);
+  }
+}
+
 function resetGame() {
   if (!gba.value) return;
 
   try {
+    const currentSave = snapshotSaveData();
     // 使用 Wrapper 的 resetEmulator 方法
-    gba.value.pause();
+    gba.value.emulator.pause();
     teardownAudio();
     gba.value.resetEmulator();
+    applySaveData(currentSave);
 
     // 重置后重新设置错误处理器，因为resetEmulator可能会清除logger
     setupErrorHandling();
@@ -556,8 +610,9 @@ function resetGame() {
 }
 
 function closeEmulator() {
+  const finalSave = snapshotSaveData();
   cleanup();
-  emit('close');
+  emit('close', finalSave);
 }
 
 function cleanup() {
@@ -568,10 +623,9 @@ function cleanup() {
   // 停止模拟器
   if (gba.value) {
     try {
-      // 先暂停，然后清理
-      if (!isPaused.value) {
-        gba.value.pause();
-      }
+      // Wrapper.pause() is a no-op in gbats 1.0.9 (it checks an unset
+      // field), so pause the core directly to stop its frame timer.
+      gba.value.emulator.pause();
 
       teardownAudio();
 
