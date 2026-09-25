@@ -44,7 +44,7 @@
         @click="$emit('read-id')"
       />
       <BaseButton
-        :disabled="!deviceReady || busy || !chipInfoValid"
+        :disabled="!deviceReady || busy"
         variant="primary"
         :text="$t('ui.operation.readRom')"
         @click="$emit('read-rom-info')"

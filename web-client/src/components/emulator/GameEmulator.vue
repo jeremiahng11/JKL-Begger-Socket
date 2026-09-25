@@ -131,6 +131,77 @@
         >
           {{ $t('ui.emulator.cheats.empty') }}
         </p>
+        <div class="cheat-db">
+          <h4 class="cheat-db-title">
+            {{ $t('ui.emulator.cheats.findTitle') }}
+          </h4>
+          <div class="cheat-db-search">
+            <input
+              v-model="dbQuery"
+              class="cheat-input"
+              type="search"
+              :placeholder="$t('ui.emulator.cheats.searchPlaceholder')"
+              @keyup.enter="searchDatabase"
+            >
+            <BaseButton
+              variant="secondary"
+              size="sm"
+              :icon="searchOutline"
+              :text="$t('ui.emulator.cheats.search')"
+              @click="searchDatabase"
+            />
+          </div>
+          <p
+            v-if="dbStatus"
+            class="cheats-hint"
+          >
+            {{ dbStatus }}
+          </p>
+          <ul
+            v-if="!dbFile && dbResults.length"
+            class="cheat-db-list"
+          >
+            <li
+              v-for="file in dbResults"
+              :key="file"
+            >
+              <button
+                class="cheat-db-file"
+                @click="openDatabaseFile(file)"
+              >
+                {{ file }}
+              </button>
+            </li>
+          </ul>
+          <div v-if="dbFile">
+            <button
+              class="cheat-db-back"
+              @click="closeDatabaseFile"
+            >
+              ← {{ dbFile }}
+            </button>
+            <ul class="cheat-db-list">
+              <li
+                v-for="(entry, index) in dbCheats"
+                :key="index"
+                class="cheat-row"
+              >
+                <span class="cheat-name">{{ entry.name }}</span>
+                <BaseButton
+                  variant="primary"
+                  size="sm"
+                  :text="isCheatAdded(entry) ? $t('ui.emulator.cheats.added') : $t('ui.emulator.cheats.add')"
+                  :disabled="isCheatAdded(entry)"
+                  @click="addDatabaseCheat(entry)"
+                />
+              </li>
+            </ul>
+          </div>
+          <p class="cheat-db-credit">
+            {{ $t('ui.emulator.cheats.credit') }}
+          </p>
+        </div>
+
         <div class="cheat-form">
           <input
             v-model="newCheatName"
@@ -236,13 +307,14 @@
 
 <script setup lang="ts">
 import { IonIcon } from '@ionic/vue';
-import { addOutline, close, keyOutline, pause, play, refresh, saveOutline, trashOutline, warning } from 'ionicons/icons';
+import { addOutline, close, keyOutline, pause, play, refresh, saveOutline, searchOutline, trashOutline, warning } from 'ionicons/icons';
 import { nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import BaseButton from '@/components/common/BaseButton.vue';
 import { useToast } from '@/composables/useToast';
 import { isCrossOriginIsolated, loadMgbaRuntime, MGBA_STATE_WITHOUT_CHEATS, type MgbaModule, removeFile } from '@/services/mgba-runtime';
+import { type CheatSystem, type DatabaseCheat, fetchCheatFile, loadCheatIndex, queryFromTitle, searchCheatFiles } from '@/utils/cheat-database';
 import { type GameCheat, loadCheats, storeCheats, toMgbaCheatsFile } from '@/utils/mgba-cheats';
 import { parseRom } from '@/utils/parsers/rom-parser';
 
@@ -274,6 +346,12 @@ const showCheats = ref(false);
 const cheats = ref<GameCheat[]>([]);
 const newCheatName = ref('');
 const newCheatCode = ref('');
+const dbQuery = ref('');
+const dbResults = ref<string[]>([]);
+const dbFile = ref<string | null>(null);
+const dbCheats = ref<DatabaseCheat[]>([]);
+const dbStatus = ref('');
+let dbSearched = false;
 const touchControls = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
 const dpad = [
@@ -448,8 +526,57 @@ function applyCheats() {
   }
 }
 
+function cheatSystem(): CheatSystem {
+  const type = props.romData ? parseRom(props.romData).type : 'GBA';
+  return type === 'GB' ? 'gb' : type === 'GBC' ? 'gbc' : 'gba';
+}
+
+async function searchDatabase() {
+  dbFile.value = null;
+  dbStatus.value = t('ui.emulator.cheats.searching');
+  try {
+    const index = await loadCheatIndex();
+    dbResults.value = searchCheatFiles(index.systems[cheatSystem()].files, dbQuery.value);
+    dbStatus.value = dbResults.value.length ? '' : t('ui.emulator.cheats.noResults');
+  } catch (error) {
+    console.error('Cheat search failed:', error);
+    dbStatus.value = t('ui.emulator.cheats.loadFailed');
+  }
+}
+
+async function openDatabaseFile(file: string) {
+  dbStatus.value = t('ui.emulator.cheats.downloading');
+  try {
+    dbCheats.value = await fetchCheatFile(await loadCheatIndex(), cheatSystem(), file);
+    dbFile.value = file;
+    dbStatus.value = dbCheats.value.length ? '' : t('ui.emulator.cheats.noResults');
+  } catch (error) {
+    console.error('Cheat download failed:', error);
+    dbStatus.value = t('ui.emulator.cheats.loadFailed');
+  }
+}
+
+function closeDatabaseFile() {
+  dbFile.value = null;
+  dbCheats.value = [];
+}
+
+function isCheatAdded(entry: DatabaseCheat): boolean {
+  return cheats.value.some(cheat => cheat.code === entry.code);
+}
+
+function addDatabaseCheat(entry: DatabaseCheat) {
+  cheats.value.push({ name: entry.name, code: entry.code, enabled: true });
+  applyCheats();
+}
+
 function toggleCheats() {
   showCheats.value = !showCheats.value;
+  if (showCheats.value && !dbSearched && props.romData) {
+    dbSearched = true;
+    dbQuery.value = queryFromTitle(parseRom(props.romData).title || props.romName);
+    void searchDatabase();
+  }
   // Typing a code must not press game buttons (A is mapped to L, for example).
   mgba?.toggleInput(!showCheats.value);
 }
@@ -867,5 +994,51 @@ function stop() {
 .cheat-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   resize: vertical;
+}
+.cheat-db {
+  margin: spacing-vars.$space-3 0;
+  padding-top: spacing-vars.$space-3;
+  border-top: 1px dashed color-vars.$color-border-light;
+}
+
+.cheat-db-title {
+  margin: 0 0 spacing-vars.$space-2 0;
+  font-size: typography-vars.$font-size-base;
+}
+
+.cheat-db-search {
+  display: flex;
+  gap: spacing-vars.$space-2;
+  margin-bottom: spacing-vars.$space-2;
+}
+
+.cheat-db-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.cheat-db-file,
+.cheat-db-back {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: spacing-vars.$space-1 0;
+  color: color-vars.$color-primary;
+  cursor: pointer;
+  font-size: typography-vars.$font-size-sm;
+}
+
+.cheat-db-back {
+  font-weight: typography-vars.$font-weight-semibold;
+}
+
+.cheat-db-credit {
+  margin: spacing-vars.$space-2 0 0 0;
+  font-size: typography-vars.$font-size-xs;
+  color: color-vars.$color-text-secondary;
 }
 </style>

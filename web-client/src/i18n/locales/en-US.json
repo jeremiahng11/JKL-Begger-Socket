@@ -116,7 +116,7 @@
       "busy": "Operating...",
       "readId": "Read Cartridge",
       "eraseChip": "Erase Chip",
-      "readRom": "Read ROM",
+      "readRom": "Detect Games",
       "startReadingMultiCart": "Starting multi-cart ROM block reading...",
       "readMultiCartSuccess": "Multi-cart reading completed",
       "readMultiCartFailed": "Multi-cart reading failed",
@@ -236,7 +236,7 @@
       "fileSize": "File Size",
       "clearFile": "Clear File",
       "write": "Write ROM",
-      "read": "Export ROM",
+      "read": "Save ROM to File",
       "verify": "Verify ROM",
       "verifyBlank": "Verify Blank",
       "blankCheckTitle": "Select Blank Pattern",
@@ -381,7 +381,16 @@
         "delete": "Delete cheat",
         "defaultName": "Cheat {number}",
         "applied": "Cheats updated",
-        "applyFailed": "Could not apply the cheats"
+        "applyFailed": "Could not apply the cheats",
+        "findTitle": "Find cheats",
+        "searchPlaceholder": "Game name",
+        "search": "Search",
+        "searching": "Searching the cheat database...",
+        "downloading": "Downloading cheats...",
+        "noResults": "Nothing found. Try fewer or different words.",
+        "loadFailed": "Could not load the cheat database. Check your internet connection.",
+        "added": "Added",
+        "credit": "Cheats from libretro-database (github.com/libretro/libretro-database)."
       }
     },
     "ram": {
