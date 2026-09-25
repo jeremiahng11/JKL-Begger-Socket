@@ -636,7 +636,7 @@
     },
     "play": {
       "title": "Play from Cartridge",
-      "hint": "Reads the game and its save from the cartridge each time you press Play. The game is kept in memory only while you play and is never stored. Your progress is written back to the cartridge, so you can continue on Android or a real Game Boy Advance.",
+      "hint": "Reads the game and its save straight from the cartridge each time you press Play; nothing is stored on this computer. Whenever you save in the game, your progress is written back to the cartridge automatically, just like on a real Game Boy Advance.",
       "start": "Play",
       "saveToCart": "Save to cartridge",
       "saving": "Saving…",

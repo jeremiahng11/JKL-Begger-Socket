@@ -1027,6 +1027,9 @@ const cartPlay = shallowRef<CartPlaySession | null>(null);
 const savingToCartridge = ref(false);
 const pendingCartSave = shallowRef<PendingCartSave | null>(null);
 let lastSyncedSave: Uint8Array | null = null;
+// Save writes run one at a time so an automatic save and the save on close
+// never talk to the cartridge at once.
+let saveQueue: Promise<unknown> = Promise.resolve();
 
 function sameBytes(a: Uint8Array | null, b: Uint8Array | null): boolean {
   if (!a || !b) return false;
@@ -1158,7 +1161,14 @@ async function playFromCartridge() {
   }
 }
 
-async function writeSaveToCartridge(pending: PendingCartSave): Promise<boolean> {
+function writeSaveToCartridge(pending: PendingCartSave): Promise<boolean> {
+  const job = saveQueue.then(() => writeSaveNow(pending));
+  saveQueue = job;
+  return job;
+}
+
+async function writeSaveNow(pending: PendingCartSave): Promise<boolean> {
+  if (sameBytes(pending.data, lastSyncedSave)) return true;
   const outcome = { ok: false };
   savingToCartridge.value = true;
 

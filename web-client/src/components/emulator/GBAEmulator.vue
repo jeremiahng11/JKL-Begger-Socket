@@ -285,6 +285,7 @@ function initializeEmulator() {
     // The emulator's first frame runs on a timer, so the save is in place
     // before the game reads it.
     applySaveData(props.saveData ?? null);
+    startAutoSave();
 
     // 设置错误处理器
     setupErrorHandling();
@@ -576,10 +577,55 @@ function snapshotSaveData(): Uint8Array | null {
   return save ? new Uint8Array(save.buffer.slice(0)) : null;
 }
 
+// Behave like a real cartridge: once the game finishes writing its save,
+// push it to the cartridge. A save counts as finished when it stops changing
+// between two polls, so a half-written save is never sent.
+const AUTO_SAVE_POLL_MS = 1500;
+let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
+let lastPolledSave: Uint8Array | null = null;
+let lastSentSave: Uint8Array | null = null;
+
 function saveToCartridge() {
   const snapshot = snapshotSaveData();
   if (snapshot) {
+    lastSentSave = snapshot;
     emit('save-to-cartridge', snapshot);
+  }
+}
+
+function bytesEqual(a: Uint8Array | null, b: Uint8Array | null): boolean {
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function startAutoSave() {
+  stopAutoSave();
+  if (!props.cartridgeSync) return;
+  lastPolledSave = snapshotSaveData();
+  lastSentSave = lastPolledSave;
+  autoSaveTimer = setInterval(pollSave, AUTO_SAVE_POLL_MS);
+}
+
+function stopAutoSave() {
+  if (autoSaveTimer) {
+    clearInterval(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+}
+
+function pollSave() {
+  if (props.savingToCartridge || hasError.value) return;
+  const current = snapshotSaveData();
+  if (!current) return;
+  const settled = bytesEqual(current, lastPolledSave);
+  lastPolledSave = current;
+  if (settled && !bytesEqual(current, lastSentSave)) {
+    lastSentSave = current;
+    emit('save-to-cartridge', current);
   }
 }
 
@@ -616,6 +662,8 @@ function closeEmulator() {
 }
 
 function cleanup() {
+  stopAutoSave();
+
   // 移除键盘事件监听器
   document.removeEventListener('keydown', handleKeyDown);
   document.removeEventListener('keyup', handleKeyUp);
