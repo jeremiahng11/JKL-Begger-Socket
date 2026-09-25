@@ -130,12 +130,14 @@ function saveBinaryFileInBrowser(data: Uint8Array, filename: string): Promise<{ 
     document.body.appendChild(anchor);
     anchor.click();
   } finally {
-    if (anchor?.parentNode) {
-      anchor.parentNode.removeChild(anchor);
-    }
-    if (url) {
-      URL.revokeObjectURL(url);
-    }
+    // Chrome reads the blob after click() returns; revoking straight away can
+    // cancel large downloads such as a 32MB ROM, so clean up later.
+    const pendingUrl = url;
+    const pendingAnchor = anchor;
+    setTimeout(() => {
+      pendingAnchor?.parentNode?.removeChild(pendingAnchor);
+      if (pendingUrl) URL.revokeObjectURL(pendingUrl);
+    }, 60_000);
   }
 
   return Promise.resolve({ saved: true });

@@ -40,6 +40,7 @@ describe('native platform facade', () => {
 
     URL.createObjectURL = createObjectURL;
     URL.revokeObjectURL = revokeObjectURL;
+    vi.useFakeTimers();
 
     try {
       const anchor = document.createElement('a');
@@ -47,12 +48,16 @@ describe('native platform facade', () => {
       vi.spyOn(anchor, 'click').mockImplementation(() => {});
 
       await expect(saveBinaryFile(new Uint8Array([1, 2, 3]), 'dump.bin')).resolves.toEqual({ saved: true });
+      // Cleanup waits so the browser can finish reading large downloads.
+      expect(revokeObjectURL).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(60_000);
       expect(invokeMock).not.toHaveBeenCalled();
       expect(createObjectURL).toHaveBeenCalledTimes(1);
       expect(appendChild).toHaveBeenCalledWith(anchor);
       expect(removeChild).toHaveBeenCalledWith(anchor);
       expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
     } finally {
+      vi.useRealTimers();
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
     }

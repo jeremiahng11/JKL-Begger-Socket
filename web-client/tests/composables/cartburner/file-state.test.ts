@@ -36,6 +36,7 @@ describe('useCartBurnerFileState', () => {
 
     URL.createObjectURL = createObjectURL;
     URL.revokeObjectURL = revokeObjectURL;
+    vi.useFakeTimers();
 
     try {
       const state = useCartBurnerFileState(vi.fn(), (key) => key);
@@ -46,11 +47,15 @@ describe('useCartBurnerFileState', () => {
       });
 
       await expect(state.saveAsFile(new Uint8Array([1, 2, 3]), 'dump.bin')).rejects.toThrow('click failed');
+      // Cleanup waits so the browser can finish reading large downloads.
+      expect(revokeObjectURL).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(60_000);
       expect(createObjectURL).toHaveBeenCalledTimes(1);
       expect(appendChild).toHaveBeenCalledWith(anchor);
       expect(removeChild).toHaveBeenCalledWith(anchor);
       expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
     } finally {
+      vi.useRealTimers();
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
     }

@@ -436,6 +436,28 @@ async function withCommandBufferReset<T>(adapter: BurnerProtocolSession, operati
   );
 }
 
+/**
+ * Operations need the cartridge's chip info. Detect it on demand instead of
+ * requiring "Read ID" first; original GBA cartridges get read-only info.
+ */
+async function ensureCartInfo(adapter: BurnerProtocolSession): Promise<CFIInfo | null> {
+  if (cfiInfo.value) return cfiInfo.value;
+  return withCommandBufferReset(adapter, async () => {
+    const result = await burnerFacade.readCart(adapter, mbcPower5V.value);
+    if (result.success && result.cfiInfo) {
+      cfiInfo.value = result.cfiInfo;
+      chipId.value = result.chipId;
+      if (result.romSizeHex) onRomSizeChange(result.romSizeHex);
+      log(result.message, 'success');
+    } else if (mode.value === 'GBA') {
+      cfiInfo.value = createReadOnlyCartInfo();
+      onRomSizeChange(formatHex(GBA_MAX_ROM_SIZE, 4));
+      log(t('messages.operation.readOnlyCartDetected'), 'info');
+    }
+    return cfiInfo.value;
+  });
+}
+
 async function readCart() {
   clearChipInfo();
   await executeOperation({
@@ -487,12 +509,13 @@ async function eraseChip() {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         resetProgress();
         return;
       }
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
       if (!currentCfiInfo.cfiDetected) {
         showToast(t('messages.operation.readOnlyCartBlocked'), 'error');
         resetProgress();
@@ -533,12 +556,13 @@ async function writeRom() {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         resetProgress();
         return;
       }
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
       if (!currentCfiInfo.cfiDetected) {
         showToast(t('messages.operation.readOnlyCartBlocked'), 'error');
         resetProgress();
@@ -590,12 +614,13 @@ async function readRom() {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         resetProgress();
         return;
       }
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
 
       const option: CommandOptions = {
         baseAddress: parseInt(selectedBaseAddress.value, 16),
@@ -672,7 +697,8 @@ async function verifyRom() {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         resetProgress();
         return;
@@ -681,7 +707,7 @@ async function verifyRom() {
         throw new Error('verifyRom requires abort signal');
       }
 
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
       const currentRomData = romFileData.value;
       const size = parseInt(selectedRomSize.value, 16);
       await withCommandBufferReset(adapter, async () => {
@@ -717,7 +743,8 @@ async function verifyBlank(fillByte: number) {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         resetProgress();
         return;
@@ -726,7 +753,7 @@ async function verifyBlank(fillByte: number) {
         throw new Error('verifyBlank requires abort signal');
       }
 
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
       const size = parseInt(selectedRomSize.value, 16);
       const blankData = new Uint8Array(size).fill(fillByte);
       const fillLabel = fillByte === 0xFF ? '0xFF' : '0x00';
@@ -759,11 +786,12 @@ async function writeRam() {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         return;
       }
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
       const currentRamData = ramFileData.value;
 
       await withCommandBufferReset(adapter, async () => {
@@ -798,11 +826,12 @@ async function readRam() {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         return;
       }
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
 
       const defaultSize = ramFileData.value ? ramFileData.value.length : parseInt(selectedRamSize.value, 16);
       await withCommandBufferReset(adapter, async () => {
@@ -853,11 +882,12 @@ async function verifyRam() {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         return;
       }
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
       const currentRamData = ramFileData.value;
 
       const size = parseInt(selectedRamSize.value, 16);
@@ -894,11 +924,12 @@ async function verifyRamBlank(fillByte: number) {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         return;
       }
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
 
       const size = parseInt(selectedRamSize.value, 16);
       const blankData = new Uint8Array(size).fill(fillByte);
@@ -972,11 +1003,12 @@ async function readRomInfo() {
         return;
       }
 
-      if (!cfiInfo.value) {
+      const ensuredCfiInfo = cfiInfo.value ?? await ensureCartInfo(adapter);
+      if (!ensuredCfiInfo) {
         showToast(t('messages.operation.readCartInfoFirst'), 'error');
         return;
       }
-      const currentCfiInfo = cfiInfo.value;
+      const currentCfiInfo = ensuredCfiInfo;
 
       log(t('ui.operation.startReadingMultiCart'));
 
@@ -1159,6 +1191,7 @@ async function playFromCartridge() {
             // Original cartridges have no flash chip to identify; they can still be read.
             log(t('messages.play.readOnlyCart'), 'info');
             cartInfo = createReadOnlyCartInfo();
+            cfiInfo.value = cartInfo;
           }
         }
 
