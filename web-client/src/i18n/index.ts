@@ -89,13 +89,13 @@ export function getLanguage(): (typeof UI_LOCALES)[number] {
     return normalizedBrowserLocale;
   }
 
-  return 'zh-Hans';
+  return 'en-US';
 }
 
 const i18n = createI18n({
   legacy: false,
   locale: getLanguage(),
-  fallbackLocale: 'zh-Hans',
+  fallbackLocale: 'en-US',
   messages,
 });
 

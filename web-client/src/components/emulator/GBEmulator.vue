@@ -138,7 +138,7 @@ function initEmulator() {
     // 设置 Canvas
     const context = gameCanvas.value.getContext('2d');
     if (!context) {
-      throw new Error('无法获取 Canvas 2D 上下文');
+      throw new Error('Unable to get Canvas 2D context');
     }
 
     // 设置帧回调

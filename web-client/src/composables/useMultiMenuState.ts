@@ -147,14 +147,14 @@ export function useMultiMenuState() {
         bgImageFileName.value = 'bg.png';
         bgImageDimensions.value = dimensions;
         processedBgImagePreviewUrl.value = processedPreviewUrl;
-        showToast(t('messages.gbaMultiMenu.bgImageLoaded', { name: 'bg.png (默认)' }), 'success');
+        showToast(t('messages.gbaMultiMenu.bgImageLoaded', { name: 'bg.png (default)' }), 'success');
       } else {
         if (!isCurrentBgImageRequest(requestId)) return;
-        showToast(t('messages.gbaMultiMenu.bgImageLoadFailed', { name: 'bg.png (默认)', status: response.status }), 'error');
+        showToast(t('messages.gbaMultiMenu.bgImageLoadFailed', { name: 'bg.png (default)', status: response.status }), 'error');
       }
     } catch (error) {
       if (!isCurrentBgImageRequest(requestId) || (error instanceof Error && error.name === 'AbortError')) return;
-      showToast(t('messages.gbaMultiMenu.bgImageLoadFailed', { name: 'bg.png (默认)', status: (error as Error).message }), 'error');
+      showToast(t('messages.gbaMultiMenu.bgImageLoadFailed', { name: 'bg.png (default)', status: (error as Error).message }), 'error');
     }
   }
 

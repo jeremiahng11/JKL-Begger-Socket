@@ -39,7 +39,7 @@
     </div>
     <div class="morse-border-container">
       <MorseBorder
-        :text="'CHISFLASH-BURNER'"
+        :text="'JKL-BURNER'"
         :height="4"
         :stroke-width="3"
         :dot-length="3"

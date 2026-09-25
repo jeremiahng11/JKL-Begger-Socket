@@ -45,7 +45,7 @@ describe('i18n', () => {
       navigatorLanguageMock = 'fr-FR'; // 不支持的语言
 
       const { getLanguage } = await import('@/i18n/index');
-      expect(getLanguage()).toBe('zh-Hans'); // 默认中文
+      expect(getLanguage()).toBe('en-US');
     });
 
     it('应该支持部分语言匹配', async () => {
@@ -133,7 +133,7 @@ describe('i18n', () => {
     it('应该使用正确的fallback语言', async () => {
       const { default: i18n } = await import('@/i18n/index');
 
-      expect(i18n.global.fallbackLocale.value).toBe('zh-Hans');
+      expect(i18n.global.fallbackLocale.value).toBe('en-US');
     });
   });
 
@@ -145,7 +145,7 @@ describe('i18n', () => {
       });
 
       const { getLanguage } = await import('@/i18n/index');
-      expect(getLanguage()).toBe('zh-Hans');
+      expect(getLanguage()).toBe('en-US');
     });
 
     it('应该处理undefined的navigator.language', async () => {
@@ -155,7 +155,7 @@ describe('i18n', () => {
       });
 
       const { getLanguage } = await import('@/i18n/index');
-      expect(getLanguage()).toBe('zh-Hans');
+      expect(getLanguage()).toBe('en-US');
     });
   });
 });

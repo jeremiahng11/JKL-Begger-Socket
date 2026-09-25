@@ -233,7 +233,7 @@ describe('GBAAdapter firmware capability gates', () => {
     const result = await adapter.eraseSectors(createCfiInfo().eraseSectorBlocks, createOptions());
 
     expect(result.success).toBe(false);
-    expect(result.message).toContain('碳酸丐 firmware');
+    expect(result.message).toContain('Calcium Beggar (STC) firmware');
     expect(mockRomEraseSector).not.toHaveBeenCalled();
   });
 
@@ -246,7 +246,7 @@ describe('GBAAdapter firmware capability gates', () => {
 
     expect(result.success).toBe(false);
     expect(result.message).toContain('GBA FRAM RAM write');
-    expect(result.message).toContain('碳酸丐 firmware');
+    expect(result.message).toContain('Calcium Beggar (STC) firmware');
   });
 
   it('allows STC ROM writes when blank sampling can skip unsupported sector erase', async () => {

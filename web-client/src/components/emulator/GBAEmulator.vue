@@ -74,7 +74,7 @@
             <span class="key-mapping">{{ $t('ui.emulator.bButton') }}: K</span>
             <span class="key-mapping">{{ $t('ui.emulator.start') }}: C</span>
             <span class="key-mapping">{{ $t('ui.emulator.select') }}: V</span>
-            <span class="key-mapping">{{ $t('ui.emulator.l') }}: Shift左</span>
+            <span class="key-mapping">{{ $t('ui.emulator.l') }}: Left Shift</span>
             <span class="key-mapping">{{ $t('ui.emulator.r') }}: L</span>
           </div>
         </div>

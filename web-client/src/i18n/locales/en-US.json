@@ -1,7 +1,7 @@
 {
   "ui": {
     "app": {
-      "title": "ChisFlash Burner"
+      "title": "JKL Burner"
     },
     "systemNotice": {
       "title": "System Notice",
@@ -476,8 +476,8 @@
       "firmware": {
         "title": "Firmware Type",
         "profile": "Current Device Firmware",
-        "stm": "丐中丐",
-        "stc": "碳酸丐"
+        "stm": "Beggar Socket (STM32)",
+        "stc": "Calcium Beggar (STC)"
       },
       "size": {
         "title": "Read/Write Settings",

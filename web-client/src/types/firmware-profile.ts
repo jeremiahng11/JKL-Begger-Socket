@@ -20,7 +20,7 @@ export interface FirmwareProfile {
 
 export const STM_FIRMWARE_PROFILE: FirmwareProfile = {
   id: 'stm',
-  label: '丐中丐',
+  label: 'Beggar Socket (STM32)',
   capabilities: {
     gbaSectorErase: true,
     gbaFramRam: true,
@@ -31,7 +31,7 @@ export const STM_FIRMWARE_PROFILE: FirmwareProfile = {
 
 export const STC_FIRMWARE_PROFILE: FirmwareProfile = {
   id: 'stc',
-  label: '碳酸丐',
+  label: 'Calcium Beggar (STC)',
   capabilities: {
     gbaSectorErase: false,
     gbaFramRam: false,

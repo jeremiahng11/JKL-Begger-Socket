@@ -415,7 +415,7 @@ export class MBC5Adapter extends CartridgeAdapter {
 
       if (timeoutBlock > 0 && totalSectors > 0) {
         const estimatedTime = timeoutBlock * totalSectors;
-        this.log(`${this.t('messages.operation.eraseTimeout')}: ${(estimatedTime / 1000).toFixed(1)}s (block 脳 ${totalSectors})`, 'info');
+        this.log(`${this.t('messages.operation.eraseTimeout')}: ${(estimatedTime / 1000).toFixed(1)}s (block × ${totalSectors})`, 'info');
         return estimatedTime;
       }
 

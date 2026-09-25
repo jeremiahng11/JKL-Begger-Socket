@@ -274,7 +274,7 @@ describe('MBC5Adapter firmware capability gates', () => {
 
     expect(result.success).toBe(false);
     expect(result.message).toContain('MBC 5V power control');
-    expect(result.message).toContain('丐中丐 firmware');
+    expect(result.message).toContain('Beggar Socket (STM32) firmware');
     expect(mockCartPower).not.toHaveBeenCalled();
   });
 

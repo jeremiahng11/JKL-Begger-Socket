@@ -40,7 +40,7 @@
           @click="goBack"
         >
           <IonIcon :icon="arrowBackOutline" />
-          返回
+          Back
         </button>
       </div>
     </div>

@@ -117,7 +117,7 @@
             @mouseenter="showBgImagePreviewHandler"
             @mouseleave="hideBgImagePreviewHandler"
           >
-            {{ bgImageFileName === 'bg.png' ? `${bgImageFileName} (默认)` : bgImageFileName }}
+            {{ bgImageFileName === 'bg.png' ? `${bgImageFileName} (default)` : bgImageFileName }}
             <span class="file-size-small">({{ formatFileSize(bgImageData.byteLength) }})</span>
           </span>
           <span

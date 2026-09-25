@@ -1,5 +1,5 @@
-# 支持碳酸丐了！
+# Calcium Beggar is now supported!
 
-现已支持碳酸丐！同时完善了设置界面，现还可对重试等更丰富的参数进行设置了！
+Calcium Beggar is now supported! The settings screen has also been improved, and you can now configure more options such as retries.
 
-对串口参数、UI性能进行了优化，传输速度也得到了提升！欢迎使用！
+Serial port parameters and UI performance have been optimized, and transfer speeds are faster. Enjoy!

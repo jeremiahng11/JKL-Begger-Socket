@@ -332,7 +332,7 @@ async function handleReadRTC(type: 'GBA' | 'MBC3') {
     } else {
       showToast(
         t('messages.tools.rtc.readFailed', {
-          error: result.error ?? '未知错误',
+          error: result.error ?? 'Unknown error',
         }),
         'error',
       );

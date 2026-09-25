@@ -212,7 +212,7 @@ async function onRefreshPorts() {
       : await deviceManager.listAvailablePorts();
   } catch (error) {
     console.error('Failed to refresh ports:', error);
-    showToast('刷新串口列表失败', 'error');
+    showToast('Failed to refresh serial port list', 'error');
   }
 }
 
