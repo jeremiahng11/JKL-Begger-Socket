@@ -64,10 +64,11 @@ const SETTING_DESCRIPTORS: readonly SettingDescriptor[] = [
   { key: 'ramPageSize', group: 'size', field: 'ramPageSize', default: 0x1000, validator: 'pageSize', errorLabel: 'RAM page size' },
   { key: 'romReadThrottleMs', group: 'throttle', field: 'romRead', default: 0, validator: 'throttle', errorLabel: 'ROM read throttle' },
   { key: 'ramReadThrottleMs', group: 'throttle', field: 'ramRead', default: 0, validator: 'throttle', errorLabel: 'RAM read throttle' },
-  { key: 'romReadRetryCount', group: 'retry', field: 'romReadCount', default: 1, validator: 'retryCount', errorLabel: 'ROM read retry count' },
-  { key: 'ramReadRetryCount', group: 'retry', field: 'ramReadCount', default: 1, validator: 'retryCount', errorLabel: 'RAM read retry count' },
-  { key: 'romReadRetryDelayMs', group: 'retry', field: 'romReadDelay', default: 0, validator: 'retryDelay', errorLabel: 'ROM read retry delay' },
-  { key: 'ramReadRetryDelayMs', group: 'retry', field: 'ramReadDelay', default: 0, validator: 'retryDelay', errorLabel: 'RAM read retry delay' },
+  // A 32MB read is ~8000 packets; an occasional dropped USB packet must not fail the whole read.
+  { key: 'romReadRetryCount', group: 'retry', field: 'romReadCount', default: 5, validator: 'retryCount', errorLabel: 'ROM read retry count' },
+  { key: 'ramReadRetryCount', group: 'retry', field: 'ramReadCount', default: 3, validator: 'retryCount', errorLabel: 'RAM read retry count' },
+  { key: 'romReadRetryDelayMs', group: 'retry', field: 'romReadDelay', default: 100, validator: 'retryDelay', errorLabel: 'ROM read retry delay' },
+  { key: 'ramReadRetryDelayMs', group: 'retry', field: 'ramReadDelay', default: 100, validator: 'retryDelay', errorLabel: 'RAM read retry delay' },
   { key: 'romWriteRetryCount', group: 'retry', field: 'romWriteRetryCount', default: 1, validator: 'retryCount', errorLabel: 'ROM write retry count' },
   { key: 'romWriteRetryDelayMs', group: 'retry', field: 'romWriteRetryDelay', default: 0, validator: 'retryDelay', errorLabel: 'ROM write retry delay' },
   { key: 'romEraseRetryCount', group: 'retry', field: 'romEraseRetryCount', default: 1, validator: 'retryCount', errorLabel: 'ROM erase retry count' },
@@ -86,6 +87,8 @@ let _firmwareProfile: ConfigurableFirmwareProfileId = 'stm';
 const LEGACY_DEFAULTS = {
   romPageSize: 0x200,
   ramPageSize: 0x100,
+  readRetryCount: 1,
+  readRetryDelay: 0,
 } as const;
 
 function validateValue(value: number, type: ValidatorType): number {
@@ -221,6 +224,13 @@ export class AdvancedSettings {
         }
         if (settings.size?.ramPageSize === LEGACY_DEFAULTS.ramPageSize) {
           settings.size.ramPageSize = _storage.ramPageSize;
+        }
+        const retry = settings.retry;
+        if (retry) {
+          if (retry.romReadCount === LEGACY_DEFAULTS.readRetryCount) retry.romReadCount = _storage.romReadRetryCount;
+          if (retry.ramReadCount === LEGACY_DEFAULTS.readRetryCount) retry.ramReadCount = _storage.ramReadRetryCount;
+          if (retry.romReadDelay === LEGACY_DEFAULTS.readRetryDelay) retry.romReadDelay = _storage.romReadRetryDelayMs;
+          if (retry.ramReadDelay === LEGACY_DEFAULTS.readRetryDelay) retry.ramReadDelay = _storage.ramReadRetryDelayMs;
         }
         this.setSettings(settings);
       }

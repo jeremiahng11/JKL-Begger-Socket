@@ -40,10 +40,10 @@ describe('AdvancedSettings', () => {
       expect(AdvancedSettings.ramPageSize).toBe(0x1000);
       expect(AdvancedSettings.romReadThrottleMs).toBe(0);
       expect(AdvancedSettings.ramReadThrottleMs).toBe(0);
-      expect(AdvancedSettings.romReadRetryCount).toBe(1);
-      expect(AdvancedSettings.ramReadRetryCount).toBe(1);
-      expect(AdvancedSettings.romReadRetryDelayMs).toBe(0);
-      expect(AdvancedSettings.ramReadRetryDelayMs).toBe(0);
+      expect(AdvancedSettings.romReadRetryCount).toBe(5);
+      expect(AdvancedSettings.ramReadRetryCount).toBe(3);
+      expect(AdvancedSettings.romReadRetryDelayMs).toBe(100);
+      expect(AdvancedSettings.ramReadRetryDelayMs).toBe(100);
       expect(AdvancedSettings.romWriteRetryCount).toBe(1);
       expect(AdvancedSettings.romWriteRetryDelayMs).toBe(0);
       expect(AdvancedSettings.romEraseRetryCount).toBe(1);
@@ -61,8 +61,8 @@ describe('AdvancedSettings', () => {
         size: { romPageSize: 0x1000, ramPageSize: 0x1000 },
         throttle: { romRead: 0, ramRead: 0 },
         retry: {
-          romReadCount: 1, ramReadCount: 1,
-          romReadDelay: 0, ramReadDelay: 0,
+          romReadCount: 5, ramReadCount: 3,
+          romReadDelay: 100, ramReadDelay: 100,
           romWriteRetryCount: 1, romWriteRetryDelay: 0,
           romEraseRetryCount: 1, romEraseRetryDelay: 0,
         },
@@ -248,6 +248,26 @@ describe('AdvancedSettings', () => {
       expect(AdvancedSettings.romPageSize).toBe(0x1000);
       expect(AdvancedSettings.firmwareProfile).toBe('stm');
       expect(AdvancedSettings.operationTimeout).toBe(30000);
+    });
+  });
+
+  describe('loadSettings migration', () => {
+    it('upgrades saved read retries left at the old defaults', () => {
+      AdvancedSettings.resetToDefaults();
+      localStorage.setItem('advanced_settings', JSON.stringify({
+        retry: { romReadCount: 1, ramReadCount: 1, romReadDelay: 0, ramReadDelay: 0 },
+      }));
+      AdvancedSettings.loadSettings();
+      expect(AdvancedSettings.romReadRetryCount).toBe(5);
+      expect(AdvancedSettings.ramReadRetryCount).toBe(3);
+      expect(AdvancedSettings.romReadRetryDelayMs).toBe(100);
+    });
+
+    it('keeps read retries the user changed', () => {
+      AdvancedSettings.resetToDefaults();
+      localStorage.setItem('advanced_settings', JSON.stringify({ retry: { romReadCount: 8 } }));
+      AdvancedSettings.loadSettings();
+      expect(AdvancedSettings.romReadRetryCount).toBe(8);
     });
   });
 
