@@ -455,6 +455,12 @@ async function readCart() {
           }
           showToast(result.message, 'success');
           log(result.message, 'success');
+        } else if (mode.value === 'GBA') {
+          // Original cartridges have no flash chip to identify; they can still be read.
+          cfiInfo.value = createReadOnlyCartInfo();
+          onRomSizeChange(formatHex(GBA_MAX_ROM_SIZE, 4));
+          showToast(t('messages.operation.readOnlyCartDetected'), 'info');
+          log(t('messages.operation.readOnlyCartDetected'), 'info');
         } else {
           showToast(result.message, 'error');
           log(result.message, 'error');
@@ -487,6 +493,11 @@ async function eraseChip() {
         return;
       }
       const currentCfiInfo = cfiInfo.value;
+      if (!currentCfiInfo.cfiDetected) {
+        showToast(t('messages.operation.readOnlyCartBlocked'), 'error');
+        resetProgress();
+        return;
+      }
 
       await withCommandBufferReset(adapter, async () => {
         const response = await burnerFacade.eraseChip(
@@ -528,6 +539,11 @@ async function writeRom() {
         return;
       }
       const currentCfiInfo = cfiInfo.value;
+      if (!currentCfiInfo.cfiDetected) {
+        showToast(t('messages.operation.readOnlyCartBlocked'), 'error');
+        resetProgress();
+        return;
+      }
       const currentRomData = romFileData.value;
       const romSize = parseInt(selectedRomSize.value, 16);
 
@@ -588,7 +604,16 @@ async function readRom() {
         enable5V: mbcPower5V.value,
       };
 
-      const romSize = parseInt(selectedRomSize.value, 16);
+      let romSize = parseInt(selectedRomSize.value, 16);
+      if (!currentCfiInfo.cfiDetected) {
+        const detected = await detectRomSize(adapter, option, romSize, signal);
+        if (!detected) {
+          resetProgress();
+          return;
+        }
+        romSize = detected;
+        log(t('messages.play.romSize', { size: formatBytes(romSize) }), 'info');
+      }
       await withCommandBufferReset(adapter, async () => {
         const response = await burnerFacade.readRom(adapter, romSize, option, signal);
         if (response.success) {

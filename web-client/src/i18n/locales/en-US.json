@@ -702,7 +702,9 @@
       "cfiParseSuccess": "CFI parsing successful",
       "cfiParseFailed": "CFI parsing failed",
       "eraseSectorFailed": "Sector erase failed",
-      "eraseSummary": "Erase completed - Total time: {totalTime}, Average speed: {avgSpeed}, Max speed: {maxSpeed}, Total sectors: {totalSectors}"
+      "eraseSummary": "Erase completed - Total time: {totalTime}, Average speed: {avgSpeed}, Max speed: {maxSpeed}, Total sectors: {totalSectors}",
+      "readOnlyCartDetected": "No flash chip found, so this is treated as an original (read-only) cartridge. Read ROM, the save panel and Play work; ROM writing is disabled.",
+      "readOnlyCartBlocked": "This is an original (read-only) cartridge, so its ROM cannot be written or erased."
     },
     "rom": {
       "writing": "Writing ROM, size {size} bytes",
