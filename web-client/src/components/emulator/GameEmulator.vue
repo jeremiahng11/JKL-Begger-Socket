@@ -21,6 +21,15 @@
             @click="saveToCartridge"
           />
           <BaseButton
+            :variant="showCheats ? 'primary' : 'secondary'"
+            size="sm"
+            :icon="keyOutline"
+            icon-only
+            :disabled="hasError || loading"
+            :title="$t('ui.emulator.cheats.title')"
+            @click="toggleCheats"
+          />
+          <BaseButton
             variant="secondary"
             size="sm"
             :icon="isPaused ? play : pause"
@@ -81,6 +90,70 @@
             @pointerdown="resumeAudio"
           />
         </template>
+      </div>
+
+      <div
+        v-if="showCheats && !hasError"
+        class="cheats-panel"
+      >
+        <p class="cheats-hint">
+          {{ $t('ui.emulator.cheats.hint') }}
+        </p>
+        <ul
+          v-if="cheats.length"
+          class="cheat-list"
+        >
+          <li
+            v-for="(cheat, index) in cheats"
+            :key="index"
+            class="cheat-row"
+          >
+            <label class="cheat-toggle">
+              <input
+                v-model="cheat.enabled"
+                type="checkbox"
+                @change="applyCheats"
+              >
+              <span class="cheat-name">{{ cheat.name }}</span>
+            </label>
+            <button
+              class="cheat-delete"
+              :title="$t('ui.emulator.cheats.delete')"
+              @click="deleteCheat(index)"
+            >
+              <IonIcon :icon="trashOutline" />
+            </button>
+          </li>
+        </ul>
+        <p
+          v-else
+          class="cheats-empty"
+        >
+          {{ $t('ui.emulator.cheats.empty') }}
+        </p>
+        <div class="cheat-form">
+          <input
+            v-model="newCheatName"
+            class="cheat-input"
+            type="text"
+            :placeholder="$t('ui.emulator.cheats.namePlaceholder')"
+          >
+          <textarea
+            v-model="newCheatCode"
+            class="cheat-input cheat-code"
+            rows="3"
+            spellcheck="false"
+            :placeholder="$t('ui.emulator.cheats.codePlaceholder')"
+          />
+          <BaseButton
+            variant="primary"
+            size="sm"
+            :icon="addOutline"
+            :text="$t('ui.emulator.cheats.add')"
+            :disabled="!newCheatCode.trim()"
+            @click="addCheat"
+          />
+        </div>
       </div>
 
       <div
@@ -163,13 +236,14 @@
 
 <script setup lang="ts">
 import { IonIcon } from '@ionic/vue';
-import { close, pause, play, refresh, saveOutline, warning } from 'ionicons/icons';
+import { addOutline, close, keyOutline, pause, play, refresh, saveOutline, trashOutline, warning } from 'ionicons/icons';
 import { nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import BaseButton from '@/components/common/BaseButton.vue';
 import { useToast } from '@/composables/useToast';
-import { isCrossOriginIsolated, loadMgbaRuntime, type MgbaModule, removeFile } from '@/services/mgba-runtime';
+import { isCrossOriginIsolated, loadMgbaRuntime, MGBA_STATE_WITHOUT_CHEATS, type MgbaModule, removeFile } from '@/services/mgba-runtime';
+import { type GameCheat, loadCheats, storeCheats, toMgbaCheatsFile } from '@/utils/mgba-cheats';
 import { parseRom } from '@/utils/parsers/rom-parser';
 
 const { t } = useI18n();
@@ -196,6 +270,10 @@ const loading = ref(false);
 const hasError = ref(false);
 const errorMessage = ref('');
 const isPaused = ref(false);
+const showCheats = ref(false);
+const cheats = ref<GameCheat[]>([]);
+const newCheatName = ref('');
+const newCheatCode = ref('');
 const touchControls = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
 const dpad = [
@@ -214,6 +292,10 @@ let mgba: MgbaModule | null = null;
 let canvas: HTMLCanvasElement | null = null;
 let romPath = '';
 let savePath = '';
+let cheatsPath = '';
+let gameKey = '';
+// State slot used to carry the game across the reload that applies cheat changes.
+const CHEAT_RELOAD_SLOT = 9;
 let saveSettleTimer: ReturnType<typeof setTimeout> | null = null;
 let savePollTimer: ReturnType<typeof setInterval> | null = null;
 let lastSentSave: Uint8Array | null = null;
@@ -282,18 +364,16 @@ async function start() {
     const paths = mgba.filePaths();
     romPath = `${paths.gamePath}/jkl-game.${romExtension()}`;
     savePath = `${paths.savePath}/jkl-game.sav`;
+    cheatsPath = `${paths.cheatsPath}/jkl-game.cheats`;
+    gameKey = cheatGameKey();
+    cheats.value = loadCheats(gameKey);
+    writeCheatsFile(); // mGBA loads this file together with the game
     // Only this session's save may be used; never a leftover from an earlier game.
     removeFile(mgba, savePath);
     if (props.saveData) mgba.FS.writeFile(savePath, props.saveData);
     mgba.FS.writeFile(romPath, props.romData);
 
-    mgba.addCoreCallbacks({
-      saveDataUpdatedCallback: scheduleCartridgeSave,
-      coreCrashedCallback: () => {
-        hasError.value = true;
-        errorMessage.value = t('ui.emulator.errors.crashed');
-      },
-    });
+    registerCallbacks();
     if (!mgba.loadGame(romPath, savePath)) {
       throw new Error(t('ui.emulator.errors.romLoadFailed'));
     }
@@ -312,6 +392,84 @@ async function start() {
   } finally {
     if (session === sessionId) loading.value = false;
   }
+}
+
+function registerCallbacks() {
+  mgba?.addCoreCallbacks({
+    saveDataUpdatedCallback: scheduleCartridgeSave,
+    coreCrashedCallback: () => {
+      hasError.value = true;
+      errorMessage.value = t('ui.emulator.errors.crashed');
+    },
+  });
+}
+
+function cheatGameKey(): string {
+  if (!props.romData) return props.romName;
+  const info = parseRom(props.romData);
+  return `${info.gameCode ?? ''}:${info.title || props.romName}`;
+}
+
+function writeCheatsFile() {
+  if (!mgba || !cheatsPath) return;
+  removeFile(mgba, cheatsPath);
+  if (cheats.value.length) {
+    mgba.FS.writeFile(cheatsPath, new TextEncoder().encode(toMgbaCheatsFile(cheats.value)));
+  }
+}
+
+/**
+ * mGBA only adds cheats when asked to load them again, so a change is applied by
+ * reloading the game with the new cheat file and restoring a snapshot (without
+ * mGBA's own copy of the cheats) taken just before.
+ */
+function applyCheats() {
+  storeCheats(gameKey, cheats.value);
+  if (!mgba || loading.value || hasError.value) return;
+  const wasPaused = isPaused.value;
+  try {
+    mgba.pauseGame();
+    const saved = mgba.saveStateSlot(CHEAT_RELOAD_SLOT, MGBA_STATE_WITHOUT_CHEATS);
+    writeCheatsFile();
+    if (!mgba.loadGame(romPath, savePath)) throw new Error(t('ui.emulator.errors.romLoadFailed'));
+    registerCallbacks();
+    mgba.pauseGame();
+    if (saved) mgba.loadStateSlot(CHEAT_RELOAD_SLOT, MGBA_STATE_WITHOUT_CHEATS);
+    mgba.toggleInput(!showCheats.value);
+    if (wasPaused) {
+      isPaused.value = true;
+    } else {
+      mgba.resumeGame();
+    }
+    showToast(t('ui.emulator.cheats.applied'), 'success');
+  } catch (error) {
+    console.error('Failed to apply cheats:', error);
+    showToast(t('ui.emulator.cheats.applyFailed'), 'error');
+  }
+}
+
+function toggleCheats() {
+  showCheats.value = !showCheats.value;
+  // Typing a code must not press game buttons (A is mapped to L, for example).
+  mgba?.toggleInput(!showCheats.value);
+}
+
+function addCheat() {
+  const code = newCheatCode.value.trim();
+  if (!code) return;
+  cheats.value.push({
+    name: newCheatName.value.trim() || t('ui.emulator.cheats.defaultName', { number: cheats.value.length + 1 }),
+    code,
+    enabled: true,
+  });
+  newCheatName.value = '';
+  newCheatCode.value = '';
+  applyCheats();
+}
+
+function deleteCheat(index: number) {
+  cheats.value.splice(index, 1);
+  applyCheats();
 }
 
 function scheduleCartridgeSave() {
@@ -412,8 +570,10 @@ function stop() {
     // The game only lives in memory for this session.
     removeFile(mgba, romPath);
     removeFile(mgba, savePath);
+    removeFile(mgba, cheatsPath);
   }
   canvas?.remove();
+  showCheats.value = false;
   mgba = null;
   isPaused.value = false;
   loading.value = false;
@@ -636,5 +796,76 @@ function stop() {
   &.face { width: 60px; height: 60px; border-radius: 50%; font-size: typography-vars.$font-size-lg; }
   &.shoulder { flex: 1; height: 40px; border-radius: radius-vars.$radius-lg; }
   &.system { flex: 1; height: 34px; border-radius: 999px; font-size: typography-vars.$font-size-sm; }
+}
+.cheats-panel {
+  padding: spacing-vars.$space-3 spacing-vars.$space-5;
+  border-top: 1px solid color-vars.$color-border-light;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.cheats-hint,
+.cheats-empty {
+  margin: 0 0 spacing-vars.$space-3 0;
+  font-size: typography-vars.$font-size-sm;
+  color: color-vars.$color-text-secondary;
+}
+
+.cheat-list {
+  list-style: none;
+  margin: 0 0 spacing-vars.$space-3 0;
+  padding: 0;
+}
+
+.cheat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: spacing-vars.$space-2;
+  padding: spacing-vars.$space-1 0;
+}
+
+.cheat-toggle {
+  display: flex;
+  align-items: center;
+  gap: spacing-vars.$space-2;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.cheat-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cheat-delete {
+  border: none;
+  background: none;
+  color: color-vars.$color-text-secondary;
+  cursor: pointer;
+  font-size: typography-vars.$font-size-lg;
+}
+
+.cheat-form {
+  display: flex;
+  flex-direction: column;
+  gap: spacing-vars.$space-2;
+}
+
+.cheat-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: spacing-vars.$space-2;
+  border: 1px solid color-vars.$color-border;
+  border-radius: radius-vars.$radius-base;
+  background: color-vars.$color-bg;
+  color: color-vars.$color-text;
+  font-size: typography-vars.$font-size-sm;
+}
+
+.cheat-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
 }
 </style>

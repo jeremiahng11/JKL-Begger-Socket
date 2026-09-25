@@ -9,6 +9,7 @@
 export interface MgbaFilePaths {
   gamePath: string;
   savePath: string;
+  cheatsPath: string;
 }
 
 interface MgbaFS {
@@ -37,7 +38,12 @@ export interface MgbaModule {
   buttonUnpress(name: string): void;
   toggleInput(enabled: boolean): void;
   addCoreCallbacks(callbacks: MgbaCoreCallbacks): void;
+  saveStateSlot(slot: number, flags: number): boolean;
+  loadStateSlot(slot: number, flags: number): boolean;
 }
+
+/** mGBA savestate sections: everything except its own copy of the cheat list. */
+export const MGBA_STATE_WITHOUT_CHEATS = 2 /* savedata */ | 8 /* RTC */ | 16 /* metadata */;
 
 type MgbaFactory = (options: { canvas: HTMLCanvasElement }) => Promise<MgbaModule>;
 
