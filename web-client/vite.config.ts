@@ -116,5 +116,16 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    // mGBA runs on threads, which need a cross-origin isolated page (see nginx.conf).
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
+  preview: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
 });

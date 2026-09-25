@@ -1,0 +1,5 @@
+mGBA emulator core compiled to WebAssembly
+Package: @thenick775/mgba-wasm 2.5.1 (unmodified)
+Source:  https://github.com/thenick775/mgba/tree/feature/wasm
+Upstream: https://mgba.io  (Copyright (c) Jeffrey Pfau and contributors)
+License: Mozilla Public License 2.0, see LICENSE-MPL-2.0.txt

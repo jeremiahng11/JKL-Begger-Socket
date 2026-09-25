@@ -1,7 +1,7 @@
 <template>
   <div class="flashburner-container">
     <Suspense v-if="cartPlay">
-      <GBAEmulator
+      <GameEmulator
         :is-visible="true"
         :rom-data="cartPlay.rom"
         :rom-name="cartPlay.name"
@@ -164,7 +164,7 @@ import { detectGbaSaveType, type GbaSaveType, trimErasedRomTail } from '@/utils/
 import { CFIInfo } from '@/utils/parsers/cfi-parser';
 import { detectMbcTypeFromRom, parseRom } from '@/utils/parsers/rom-parser.ts';
 
-const GBAEmulator = defineAsyncComponent(() => import('@/components/emulator/GBAEmulator.vue'));
+const GameEmulator = defineAsyncComponent(() => import('@/components/emulator/GameEmulator.vue'));
 
 type ModeType = 'GBA' | 'MBC5';
 type RamType = 'SRAM' | 'FLASH';

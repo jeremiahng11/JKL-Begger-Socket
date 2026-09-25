@@ -133,28 +133,11 @@
       </div>
     </BaseModal>
 
-    <!-- Game Boy Color Emulator -->
+    <!-- Emulator (mGBA: GBA, GB and GBC) -->
     <Suspense>
-      <GBCEmulator
-        v-if="currentEmulator === 'GBC' || currentEmulator === 'GB'"
-        :is-visible="currentEmulator === 'GBC' || currentEmulator === 'GB'"
-        :rom-data="emulatorRomData"
-        :rom-name="emulatorRomName"
-        @close="closeEmulator"
-      />
-      <template #fallback>
-        <div class="emulator-loading">
-          <div class="loading-spinner" />
-          <p>{{ $t('ui.emulator.loading') }}...</p>
-        </div>
-      </template>
-    </Suspense>
-
-    <!-- GBA Emulator -->
-    <Suspense>
-      <GBAEmulator
-        v-if="currentEmulator === 'GBA'"
-        :is-visible="currentEmulator === 'GBA'"
+      <GameEmulator
+        v-if="currentEmulator !== null"
+        :is-visible="currentEmulator !== null"
         :rom-data="emulatorRomData"
         :rom-name="emulatorRomName"
         @close="closeEmulator"
@@ -190,10 +173,7 @@ import { GBA_ROM_BASE_ADDRESS, MBC5_ROM_BASE_ADDRESS } from '@/utils/address-uti
 import { formatHex } from '@/utils/formatter-utils';
 import { parseRom, type RomInfo } from '@/utils/parsers/rom-parser.ts';
 
-// 动态加载模拟器组件
-// const GBEmulator = defineAsyncComponent(() => import('@/components/emulator/GBEmulator.vue'));
-const GBCEmulator = defineAsyncComponent(() => import('@/components/emulator/GBCEmulator.vue'));
-const GBAEmulator = defineAsyncComponent(() => import('@/components/emulator/GBAEmulator.vue'));
+const GameEmulator = defineAsyncComponent(() => import('@/components/emulator/GameEmulator.vue'));
 
 const { t } = useI18n();
 const { showToast } = useToast();

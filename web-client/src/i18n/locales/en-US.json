@@ -345,7 +345,7 @@
       "r": "R Button",
       "buttons": "A/B Buttons",
       "startSelect": "Start/Select",
-      "controlsHelp": "Use keyboard to control the game",
+      "controlsHelp": "Keyboard controls (you can hold keys down)",
       "initSuccess": "Emulator initialized successfully",
       "errors": {
         "invalidRom": "Invalid ROM file",
@@ -365,8 +365,10 @@
         "keyPressError": "Key press error: {error}",
         "pauseResumeError": "Pause/resume error: {error}",
         "resetError": "Reset error: {error}",
-        "tooManyRetries": "Too many retries, please refresh the page"
-      }
+        "tooManyRetries": "Too many retries, please refresh the page",
+        "notIsolated": "The emulator needs the site to send cross-origin isolation headers. Redeploy the latest version, then refresh."
+      },
+      "gamepadHint": "Game controllers work too: connect one and press a button."
     },
     "ram": {
       "title": "RAM Operations",
