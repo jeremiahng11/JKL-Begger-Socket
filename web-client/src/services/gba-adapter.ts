@@ -39,6 +39,7 @@ import { calcSectorUsage } from '@/utils/sector-utils';
 export class GBAAdapter extends CartridgeAdapter {
   private static readonly ROM_BANK_SIZE = 1 << 25;
   private static readonly RAM_BANK_SWITCH_SETTLE_MS = 100;
+  private static readonly FLASH_SAVE_ERASE_TIMEOUT_MS = 20_000;
   private static readonly CHIP_ERASE_TIMEOUT_MS = 120_000;
 
   /**
@@ -1186,6 +1187,9 @@ export class GBAAdapter extends CartridgeAdapter {
             await ram_erase_flash(this.transport);
 
             // 绛夊緟鎿﹂櫎瀹屾垚
+            // Some save chips never report erased; give up instead of hanging
+            // (a hung write keeps every burner button disabled).
+            const eraseDeadline = Date.now() + GBAAdapter.FLASH_SAVE_ERASE_TIMEOUT_MS;
             let erased = false;
             while (!erased) {
               const result = await ram_read(this.transport, 1);
@@ -1193,6 +1197,8 @@ export class GBAAdapter extends CartridgeAdapter {
               if (result[0] === 0xff) {
                 this.log(this.t('messages.gba.eraseComplete'), 'success');
                 erased = true;
+              } else if (Date.now() > eraseDeadline) {
+                throw new Error(`Flash save erase did not finish within ${GBAAdapter.FLASH_SAVE_ERASE_TIMEOUT_MS / 1000}s`);
               } else {
                 await timeout(1000);
               }

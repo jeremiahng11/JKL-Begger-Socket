@@ -106,6 +106,12 @@
           @click="onVerifyClick"
         />
       </div>
+      <p
+        v-if="!deviceReady || busy"
+        class="disabled-hint"
+      >
+        {{ !deviceReady ? $t('ui.rom.connectFirst') : $t('ui.rom.busyHint') }}
+      </p>
     </section>
 
     <!-- 空白检测模式选择对话框 -->
@@ -425,6 +431,12 @@ const hasAssembledRom = computed(() => {
 </script>
 
 <style scoped>
+.disabled-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
 .section {
   margin-bottom: var(--space-7);
 }

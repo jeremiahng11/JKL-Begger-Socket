@@ -267,7 +267,9 @@
       "ramSize": "RAM Size",
       "valid": "Valid",
       "logo": "Logo",
-      "edit": "Edit ROM Info"
+      "edit": "Edit ROM Info",
+      "connectFirst": "Connect the burner with \"Connect Device\" to use these buttons.",
+      "busyHint": "Another operation is still running (for example writing your save to the cartridge). The buttons come back when it finishes."
     },
     "romAnalyzer": {
       "uploadPrompt": "Select ROM file or drag it here",
