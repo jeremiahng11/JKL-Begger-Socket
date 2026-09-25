@@ -5,14 +5,6 @@
         <div class="op-title-row">
           <span :class="['op-title', { busy }]">{{ $t('ui.play.title') }}</span>
         </div>
-        <label class="cache-toggle">
-          <input
-            v-model="useRomCache"
-            type="checkbox"
-            :disabled="busy"
-          >
-          {{ $t('ui.play.useCache') }}
-        </label>
       </div>
       <p class="play-hint">
         {{ $t('ui.play.hint') }}
@@ -65,8 +57,6 @@ defineEmits<{
   'retry-save': [];
   'download-save': [];
 }>();
-
-const useRomCache = defineModel<boolean>('useRomCache', { required: true });
 </script>
 
 <style scoped>
@@ -102,15 +92,6 @@ const useRomCache = defineModel<boolean>('useRomCache', { required: true });
 .op-title.busy {
   color: var(--color-warning);
   font-weight: bold;
-}
-
-.cache-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  cursor: pointer;
 }
 
 .play-hint {

@@ -73,7 +73,6 @@
           <PlayOperations
             v-if="mode === 'GBA'"
             key="play-operations"
-            v-model:use-rom-cache="useRomCache"
             :device-ready="deviceReady"
             :busy="busy"
             :has-pending-save="pendingCartSave !== null"
@@ -163,7 +162,6 @@ import { formatBytes, formatHex } from '@/utils/formatter-utils';
 import { detectGbaSaveType, type GbaSaveType, trimErasedRomTail } from '@/utils/gba-save-type';
 import { CFIInfo } from '@/utils/parsers/cfi-parser';
 import { detectMbcTypeFromRom, parseRom } from '@/utils/parsers/rom-parser.ts';
-import { getCachedRom, putCachedRom, ROM_FINGERPRINT_SIZE, romFingerprint } from '@/utils/rom-cache';
 
 const GBAEmulator = defineAsyncComponent(() => import('@/components/emulator/GBAEmulator.vue'));
 
@@ -1025,7 +1023,6 @@ function logDeviceFirmwareProfile(deviceInfo: DeviceInfo) {
 
 // Play from cartridge: read the ROM and save off the cartridge, run them in
 // the emulator, and write the save back so progress stays on the cartridge.
-const useRomCache = ref(true);
 const cartPlay = shallowRef<CartPlaySession | null>(null);
 const savingToCartridge = ref(false);
 const pendingCartSave = shallowRef<PendingCartSave | null>(null);
@@ -1067,31 +1064,12 @@ async function readCartridgeRom(
   options: CommandOptions,
   signal?: AbortSignal,
 ): Promise<Uint8Array | null> {
-  let cacheKey: string | null = null;
-  if (useRomCache.value) {
-    const head = await burnerFacade.readRom(adapter, ROM_FINGERPRINT_SIZE, options, signal, false);
-    if (!head.success || !head.data) {
-      showToast(head.message, 'error');
-      return null;
-    }
-    cacheKey = await romFingerprint(head.data, options.baseAddress ?? 0);
-    const cached = await getCachedRom(cacheKey);
-    if (cached) {
-      log(t('messages.play.cacheHit'), 'info');
-      return cached;
-    }
-  }
-
   const response = await burnerFacade.readRom(adapter, parseInt(selectedRomSize.value, 16), options, signal);
   if (!response.success || !response.data) {
     showToast(response.message, 'error');
     return null;
   }
-  const rom = trimErasedRomTail(response.data);
-  if (cacheKey) {
-    await putCachedRom(cacheKey, rom, parseRom(rom).title);
-  }
-  return rom;
+  return trimErasedRomTail(response.data);
 }
 
 async function playFromCartridge() {
@@ -1273,6 +1251,13 @@ function warnUnsavedProgress(event: BeforeUnloadEvent) {
 
 onMounted(() => {
   window.addEventListener('beforeunload', warnUnsavedProgress);
+  // Earlier builds kept a copy of cartridge ROMs in the browser; remove it so
+  // games only ever live on the cartridge.
+  try {
+    indexedDB.deleteDatabase('jkl-burner-rom-cache');
+  } catch {
+    // IndexedDB unavailable; nothing to clean up.
+  }
 });
 onUnmounted(() => {
   window.removeEventListener('beforeunload', warnUnsavedProgress);

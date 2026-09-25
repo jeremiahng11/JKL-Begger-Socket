@@ -636,8 +636,7 @@
     },
     "play": {
       "title": "Play from Cartridge",
-      "hint": "Reads the game and its save from the cartridge, then plays it here. Your progress is written back to the cartridge, so you can continue on Android or a real Game Boy Advance.",
-      "useCache": "Reuse ROM read earlier",
+      "hint": "Reads the game and its save from the cartridge each time you press Play. The game is kept in memory only while you play and is never stored. Your progress is written back to the cartridge, so you can continue on Android or a real Game Boy Advance.",
       "start": "Play",
       "saveToCart": "Save to cartridge",
       "saving": "Saving…",
@@ -925,7 +924,6 @@
     },
     "play": {
       "notGba": "The cartridge does not contain a valid GBA game",
-      "cacheHit": "Using the ROM read earlier for this cartridge",
       "saveType": "Save type: {kind} ({size}), cartridge RAM type: {ramType}",
       "noSave": "This game does not use save data",
       "eepromUnsupported": "This game uses EEPROM saves, which the burner cannot read or write. Progress will not be saved to the cartridge.",
