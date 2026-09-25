@@ -15,7 +15,7 @@ export interface FlashCommandSet {
   readonly unlockAddr2: number;
   encodeByte(value: number): Uint8Array;
   write(input: ProtocolTransportInput, data: Uint8Array, address: number): Promise<void>;
-  read(input: ProtocolTransportInput, size: number, address: number): Promise<Uint8Array>;
+  read(input: ProtocolTransportInput, size: number, address: number, readTimeoutMs?: number): Promise<Uint8Array>;
 }
 
 /**

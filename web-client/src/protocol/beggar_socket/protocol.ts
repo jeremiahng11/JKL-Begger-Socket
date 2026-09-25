@@ -165,12 +165,12 @@ export async function rom_write(input: ProtocolTransportInput, data: Uint8Array,
 /**
  * GBA: ROM Read (0xf6)
  */
-export async function rom_read(input: ProtocolTransportInput, size: number, baseAddress = 0): Promise<Uint8Array> {
+export async function rom_read(input: ProtocolTransportInput, size: number, baseAddress = 0, readTimeoutMs?: number): Promise<Uint8Array> {
   const payload = createCommandPayload(GBACommand.READ)
     .addAddress(baseAddress)
     .addLength(size)
     .build();
-  return sendAndReadProtocolPayload(input, payload, 'GBA ROM read', size, baseAddress);
+  return sendAndReadProtocolPayload(input, payload, 'GBA ROM read', size, baseAddress, undefined, readTimeoutMs);
 }
 
 /**
@@ -307,13 +307,13 @@ export async function gbc_write(input: ProtocolTransportInput, data: Uint8Array,
 /**
  *  GBC: Read (0xfb)
  */
-export async function gbc_read(input: ProtocolTransportInput, size: number, baseAddress = 0): Promise<Uint8Array> {
+export async function gbc_read(input: ProtocolTransportInput, size: number, baseAddress = 0, readTimeoutMs?: number): Promise<Uint8Array> {
   const payload = createCommandPayload(GBCCommand.READ)
     .addAddress(baseAddress)
     .addLength(size)
     .build();
 
-  return sendAndReadProtocolPayload(input, payload, 'GBC read', size, baseAddress);
+  return sendAndReadProtocolPayload(input, payload, 'GBC read', size, baseAddress, undefined, readTimeoutMs);
 }
 
 /**

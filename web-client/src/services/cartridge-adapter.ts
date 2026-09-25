@@ -324,6 +324,11 @@ export class CartridgeAdapter {
     return transport;
   }
 
+  /** Allows ~50KB/s (the slowest firmware) plus a fixed margin before giving up on a chunk. */
+  static romChunkStallTimeoutMs(chunkSize: number): number {
+    return Math.min(AdvancedSettings.packageReceiveTimeout, 300 + Math.ceil(chunkSize / 20));
+  }
+
   protected async withPowerConfig<T>(_enable5V: boolean, fn: () => Promise<T>): Promise<T> {
     return fn();
   }
@@ -345,7 +350,10 @@ export class CartridgeAdapter {
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
-        return await this.ops.flashCmdSet.read(this.transport, chunkSize, cartAddress);
+        // A chunk streams in within milliseconds; when bytes go missing, stop waiting
+        // early and retry. The final attempt keeps the full timeout as a safety net.
+        const readTimeoutMs = attempt < attempts ? CartridgeAdapter.romChunkStallTimeoutMs(chunkSize) : undefined;
+        return await this.ops.flashCmdSet.read(this.transport, chunkSize, cartAddress, readTimeoutMs);
       } catch (error) {
         lastError = error;
         this.log(
