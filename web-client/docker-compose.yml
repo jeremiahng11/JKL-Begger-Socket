@@ -4,6 +4,6 @@ services:
       context: .
       args:
         VITE_SENTRY_DSN: ""
-    ports:
-      - "8080:80"
+    expose:
+      - "80"
     restart: unless-stopped
