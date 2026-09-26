@@ -66,7 +66,7 @@
 #define USBD_LANGID_STRING           1033
 #define USBD_MANUFACTURER_STRING     "CNY Industry"
 #define USBD_PID_FS                  0x0721
-#define USBD_PRODUCT_STRING_FS       "GBA Burner for ChisFlash"
+#define USBD_PRODUCT_STRING_FS       "JKL GBA Burner"
 #define USBD_CONFIGURATION_STRING_FS "CDC Config"
 #define USBD_INTERFACE_STRING_FS     "CDC Interface"
 
