@@ -151,6 +151,7 @@ import { runWithCommandBufferReset, useCartBurnerFileState, useCartBurnerSession
 import { useToast } from '@/composables/useToast';
 import { createCartridgeProtocolSession } from '@/features/burner/adapters';
 import { type BurnerProtocolSession, createBurnerFacade, type GameDetectionResult } from '@/features/burner/application';
+import { prepareSaveFolder } from '@/platform/save-folder';
 import { CartridgeAdapter, GBAAdapter, MBC5Adapter } from '@/services';
 import { AdvancedSettings } from '@/settings/advanced-settings';
 import { useRecentFileNamesStore } from '@/stores/recent-file-names-store';
@@ -600,6 +601,7 @@ async function writeRom() {
 }
 
 async function readRom() {
+  await prepareSaveFolder();
   await executeOperation({
     cancellable: true,
     resetProgressOnFinish: false,
@@ -664,7 +666,7 @@ async function readRom() {
             }
             const saveResult = await saveAsFile(response.data, fileName);
             if (saveResult.saved) {
-              log(t('messages.rom.exportSuccess', { name: fileName }), 'success');
+              log(t('messages.rom.exportSuccess', { name: saveResult.path ?? fileName }), 'success');
             } else {
               showToast(t('messages.operation.cancelled'), 'info');
               log(t('messages.operation.cancelled'), 'warn');
@@ -818,6 +820,7 @@ async function writeRam() {
 }
 
 async function readRam() {
+  await prepareSaveFolder();
   await executeOperation({
     operation: async () => {
       const adapter = getAdapter();
@@ -854,7 +857,7 @@ async function readRam() {
             } else {
               const saveResult = await saveAsFile(response.data, defaultFileName);
               if (saveResult.saved) {
-                log(t('messages.ram.exportSuccess', { name: defaultFileName }), 'success');
+                log(t('messages.ram.exportSuccess', { name: saveResult.path ?? defaultFileName }), 'success');
               } else {
                 showToast(t('messages.operation.cancelled'), 'info');
                 log(t('messages.operation.cancelled'), 'warn');
@@ -1338,11 +1341,12 @@ async function retryPendingSave() {
 }
 
 async function downloadPendingSave() {
+  await prepareSaveFolder();
   const pending = pendingCartSave.value;
   if (!pending) return;
   const result = await saveAsFile(pending.data, `${pending.name}.sav`);
   if (result.saved) {
-    log(t('messages.ram.exportSuccess', { name: `${pending.name}.sav` }), 'success');
+    log(t('messages.ram.exportSuccess', { name: result.path ?? `${pending.name}.sav` }), 'success');
   }
 }
 

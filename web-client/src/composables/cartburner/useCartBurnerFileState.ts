@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 
 import { saveBinaryFile } from '@/platform/native';
+import { prepareSaveFolder } from '@/platform/save-folder';
 import type { FileInfo } from '@/types/file-info';
 import { formatBytes } from '@/utils/formatter-utils';
 
@@ -92,12 +93,13 @@ export function useCartBurnerFileState(log: (message: string) => void, translate
 
   async function onFileNameSelected(fileName: string) {
     if (pendingRamData.value) {
+      await prepareSaveFolder();
       const fileExtension = fileName.includes('.') ? '' : '.sav';
       const outputName = `${fileName}${fileExtension}`;
       const result = await saveAsFile(pendingRamData.value, outputName);
       if (result.saved) {
         pendingRamData.value = null;
-        log(translate('messages.ram.exportSuccess', { name: outputName }));
+        log(translate('messages.ram.exportSuccess', { name: result.path ?? outputName }));
       } else {
         log(translate('messages.operation.cancelled'));
       }

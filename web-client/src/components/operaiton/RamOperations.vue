@@ -110,6 +110,7 @@
           />
         </div>
       </div>
+      <SaveFolderHint />
     </section>
 
     <!-- 空白检测模式选择对话框 -->
@@ -148,6 +149,7 @@ import { useI18n } from 'vue-i18n';
 import BaseButton from '@/components/common/BaseButton.vue';
 import BaseModal from '@/components/common/BaseModal.vue';
 import FileDropZone from '@/components/common/FileDropZone.vue';
+import SaveFolderHint from '@/components/common/SaveFolderHint.vue';
 import { type OperationFileEventPayload, RAM_OPERATION_EVENTS, type RamOperationsProps } from '@/components/operaiton/contracts';
 import { MBC5_RAM_BASE_ADDRESS } from '@/utils/address-utils';
 import { formatHex } from '@/utils/formatter-utils';

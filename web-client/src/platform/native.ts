@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 import { isTauriRuntime, isWebRuntime } from '@/platform/runtime';
+import { writeToSaveFolder } from '@/platform/save-folder';
 import type { SerialPortInfo } from '@/types/serial';
 
 export interface NativeRuntimeMetadata {
@@ -117,7 +118,13 @@ export function closeNativeSerial(sessionId: number): Promise<void> {
   return invoke('native_serial_close', { sessionId });
 }
 
-function saveBinaryFileInBrowser(data: Uint8Array, filename: string): Promise<{ saved: boolean; path?: string }> {
+async function saveBinaryFileInBrowser(data: Uint8Array, filename: string): Promise<{ saved: boolean; path?: string }> {
+  const path = await writeToSaveFolder(data, filename);
+  if (path) return { saved: true, path };
+  return downloadInBrowser(data, filename);
+}
+
+function downloadInBrowser(data: Uint8Array, filename: string): Promise<{ saved: boolean; path?: string }> {
   let url: string | null = null;
   let anchor: HTMLAnchorElement | null = null;
 

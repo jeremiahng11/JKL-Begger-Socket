@@ -112,6 +112,7 @@
       >
         {{ !deviceReady ? $t('ui.rom.connectFirst') : $t('ui.rom.busyHint') }}
       </p>
+      <SaveFolderHint />
     </section>
 
     <!-- 空白检测模式选择对话框 -->
@@ -169,6 +170,7 @@ import BaseButton from '@/components/common/BaseButton.vue';
 import BaseModal from '@/components/common/BaseModal.vue';
 import FileDropZone from '@/components/common/FileDropZone.vue';
 import RomInfoPanel from '@/components/common/RomInfoPanel.vue';
+import SaveFolderHint from '@/components/common/SaveFolderHint.vue';
 import { type OperationFileEventPayload, ROM_OPERATION_EVENTS, type RomOperationsProps } from '@/components/operaiton/contracts';
 import { useToast } from '@/composables/useToast';
 import { useRecentFileNamesStore } from '@/stores/recent-file-names-store';

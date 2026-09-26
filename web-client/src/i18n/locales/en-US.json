@@ -669,6 +669,12 @@
       "pendingSave": "Game progress has not been written to the cartridge yet.",
       "retrySave": "Write save to cartridge",
       "downloadSave": "Download .sav"
+    },
+    "saveFolder": {
+      "savesTo": "Files are saved to",
+      "notChosen": "You'll be asked where to save files the first time.",
+      "change": "Change",
+      "choose": "Choose folder"
     }
   },
   "messages": {
