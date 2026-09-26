@@ -277,9 +277,11 @@ $title-color: #2c3e50;
   gap: spacing-vars.$space-2;
   flex: 1;
   min-width: 0;
+  flex-wrap: wrap;
 
   @include mixins.respond-to(lg) {
     gap: spacing-vars.$space-3;
+    flex-wrap: nowrap;
   }
 }
 
@@ -302,6 +304,14 @@ $title-color: #2c3e50;
   align-items: flex-start;
   gap: spacing-vars.$space-1;
   margin-left: spacing-vars.$space-2;
+  min-width: 0;
+
+  // Phones: title on its own row above the buttons.
+  @media (max-width: 599px) {
+    order: -1;
+    width: 100%;
+    margin-left: 0;
+  }
 
   @include mixins.respond-to(lg) {
     @include mixins.flex-center;
@@ -343,6 +353,11 @@ $title-color: #2c3e50;
   font-weight: typography-vars.$font-weight-medium;
   text-decoration: none;
   @include mixins.text-truncate;
+
+  // No room for it beside the title on phones.
+  @media (max-width: 599px) {
+    display: none;
+  }
 
   &:hover {
     @include badge-gradient($badge-secondary, $badge-primary);

@@ -661,7 +661,8 @@
     },
     "play": {
       "title": "Play from Cartridge",
-      "hint": "Reads the game and its save straight from the cartridge each time you press Play; nothing is stored on this computer. Whenever you save in the game, your progress is written back to the cartridge automatically, just like on a real Game Boy Advance.",
+      "hint": "Plays the game straight from the cartridge; nothing is stored on this computer. Saves you make in the game are written back to the cartridge, so you can keep playing on your Game Boy Advance or phone.",
+      "connectFirst": "Connect the burner with \"Connect Device\", insert a cartridge, then press Play.",
       "start": "Play",
       "saveToCart": "Save to cartridge",
       "saving": "Saving…",

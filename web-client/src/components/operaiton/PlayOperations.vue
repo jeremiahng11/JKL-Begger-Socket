@@ -1,6 +1,6 @@
 <template>
   <div class="rom-operations-container">
-    <section class="section">
+    <section class="section play-card">
       <div class="section-header">
         <div class="op-title-row">
           <span :class="['op-title', { busy }]">{{ $t('ui.play.title') }}</span>
@@ -37,6 +37,12 @@
           @click="$emit('play')"
         />
       </div>
+      <p
+        v-if="!deviceReady"
+        class="play-hint play-hint--center"
+      >
+        {{ $t('ui.play.connectFirst') }}
+      </p>
     </section>
   </div>
 </template>
@@ -62,6 +68,19 @@ defineEmits<{
 <style scoped>
 .section {
   margin-bottom: var(--space-7);
+}
+
+.play-card {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  margin-bottom: var(--space-6, 24px);
+}
+
+.play-hint--center {
+  margin: var(--space-2) 0 0;
+  text-align: center;
 }
 
 .section-header {

@@ -50,6 +50,17 @@
           tag="div"
           class="operations-container"
         >
+          <PlayOperations
+            v-if="mode === 'GBA'"
+            key="play-operations"
+            :device-ready="deviceReady"
+            :busy="busy"
+            :has-pending-save="pendingCartSave !== null"
+            @play="playFromCartridge"
+            @retry-save="retryPendingSave"
+            @download-save="downloadPendingSave"
+          />
+
           <ChipOperations
             key="chip-operations"
             :mode="mode"
@@ -68,17 +79,6 @@
             @read-rom-info="readRomInfo"
             @mbc-type-change="(value: string) => selectedMbcType = value as MbcType"
             @mbc-power-change="mbcPower5V = $event"
-          />
-
-          <PlayOperations
-            v-if="mode === 'GBA'"
-            key="play-operations"
-            :device-ready="deviceReady"
-            :busy="busy"
-            :has-pending-save="pendingCartSave !== null"
-            @play="playFromCartridge"
-            @retry-save="retryPendingSave"
-            @download-save="downloadPendingSave"
           />
 
           <RomOperations
