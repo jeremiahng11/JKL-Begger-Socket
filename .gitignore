@@ -423,3 +423,4 @@ build/
 
 # Firmware builds (mcu/dist holds the latest .bin/.hex to flash)
 mcu/dist/
+mcu/build-jkl/

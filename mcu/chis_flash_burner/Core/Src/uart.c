@@ -5,6 +5,7 @@
 #include "usbd_cdc_if.h"
 
 #include "cart_adapter.h"
+#include "jkl_flash_layout.h"
 #include "uart.h"
 
 #define BATCH_SIZE_RW 512
@@ -77,6 +78,8 @@ static void gbcRead();
 static void gbcRomProgram();
 static void gbcWrite_forFram();
 static void gbcRead_forFram();
+static void firmwareInfo();
+static void enterUpdater();
 
 uint16_t modbusCRC16(const uint8_t *buf, uint16_t len)
 {
@@ -259,6 +262,14 @@ void uart_cmdHandler()
 
         case 0xeb:  // gbc 带延迟读取
             gbcRead_forFram();
+            break;
+
+        case 0xb0:  // JKL: firmware name, version and features
+            firmwareInfo();
+            break;
+
+        case 0xb1:  // JKL: restart into the USB updater (bootloader)
+            enterUpdater();
             break;
 
         default:
@@ -854,4 +865,37 @@ void gbcRead_forFram()
     // 返回数据
     uart_clearRecvBuf();
     uart_responData(NULL, byteCount);
+}
+
+// JKL: firmware info
+// i 2B.包大小 0xb0 2B.CRC
+// o 2B.CRC 64B.ASCII "name|version|hardware|bootloader|features", zero padded
+static void firmwareInfo()
+{
+    static const char info[64] = "JKL GBA Burner|" JKL_FW_VERSION_STR "|stm32|boot1|gba,gbc,fram,sector-erase";
+
+    uart_clearRecvBuf();
+    uart_responData((const uint8_t *)info, sizeof(info));
+}
+
+// JKL: restart into the updater. The bootloader sees the request in backup
+// register DR1 and stays in updater mode (USB 0483:0722).
+// i 2B.包大小 0xb1 2B.CRC
+// o 0xaa
+static void enterUpdater()
+{
+    uart_clearRecvBuf();
+    uart_responAck();
+
+    const USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
+    uint32_t start = HAL_GetTick();
+    while (hcdc->TxState != 0 && HAL_GetTick() - start < 200) {
+    }
+    HAL_Delay(50);
+
+    __HAL_RCC_PWR_CLK_ENABLE();
+    __HAL_RCC_BKP_CLK_ENABLE();
+    HAL_PWR_EnableBkUpAccess();
+    BKP->DR1 = JKL_BOOT_REQUEST;
+    NVIC_SystemReset();
 }

@@ -100,6 +100,7 @@ set(ASM_SOURCES
 
 set(INCLUDE_DIRECTORIES
     Core/Inc
+    ../common
     Drivers/CMSIS/Device/ST/STM32F1xx/Include
     Drivers/CMSIS/Include
     Drivers/STM32F1xx_HAL_Driver/Inc
@@ -142,6 +143,10 @@ set(PROJECT_DEFINES
     -DUSE_HAL_DRIVER
     -DSTM32F103xB
 )
+
+# JKL firmware version: reported by command 0xb0 and stored by the bootloader.
+set(JKL_FW_VERSION "1.1.0")
+list(APPEND PROJECT_DEFINES "-DJKL_FW_VERSION_STR=\"${JKL_FW_VERSION}\"")
 
 # Add build timestamp
 string(TIMESTAMP BUILD_TIMESTAMP "%s")

@@ -108,6 +108,17 @@
           <span class="beta-badge">NEW</span>
         </button-->
 
+        <button
+          class="menu-item"
+          @click="openFirmwareUpdate"
+        >
+          <IonIcon :icon="hardwareChipOutline" />
+          <div class="menu-item-content">
+            <span class="menu-item-title">{{ $t('ui.firmware.title') }}</span>
+            <span class="menu-item-desc">{{ $t('ui.firmware.menuDesc') }}</span>
+          </div>
+        </button>
+
         <div class="menu-divider" />
 
         <button
@@ -160,6 +171,11 @@
       @close="closeCartridgeTools"
     />
 
+    <FirmwareUpdateModal
+      v-model="isFirmwareUpdateVisible"
+      :device="device"
+    />
+
     <!-- 关于弹框 -->
     <AboutModal
       v-model="isAboutVisible"
@@ -182,6 +198,7 @@ import {
   buildOutline,
   constructOutline,
   gameControllerOutline,
+  hardwareChipOutline,
   informationCircleOutline,
   menuOutline,
   notificationsOutline,
@@ -196,6 +213,7 @@ import AboutModal from '@/components/modal/AboutModal.vue';
 import AdvancedSettingsModal from '@/components/modal/AdvancedSettingsModal.vue';
 import CartridgeToolsModal from '@/components/modal/CartridgeToolsModal.vue';
 import DebugToolModal from '@/components/modal/DebugToolModal.vue';
+import FirmwareUpdateModal from '@/components/modal/FirmwareUpdateModal.vue';
 import RomAnalyzerModal from '@/components/modal/RomAnalyzerModal.vue';
 import SystemNoticeHistoryModal from '@/components/modal/SystemNoticeHistoryModal.vue';
 import { useToast } from '@/composables/useToast';
@@ -221,6 +239,7 @@ const isCartridgeToolsVisible = ref(false);
 const isSettingsVisible = ref(false);
 const isAboutVisible = ref(false);
 const isSystemNoticeHistoryVisible = ref(false);
+const isFirmwareUpdateVisible = ref(false);
 const clickCount = ref(0);
 let clickTimer: NodeJS.Timeout | null = null;
 
@@ -320,6 +339,11 @@ function openCartridgeTools() {
 
 function closeCartridgeTools() {
   isCartridgeToolsVisible.value = false;
+}
+
+function openFirmwareUpdate() {
+  closeMenu();
+  isFirmwareUpdateVisible.value = true;
 }
 
 function openSettings() {

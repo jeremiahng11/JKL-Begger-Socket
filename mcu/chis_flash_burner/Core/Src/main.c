@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "cart_adapter.h"
+#include "jkl_flash_layout.h"
 #include "uart.h"
 /* USER CODE END Includes */
 
@@ -56,6 +57,20 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/* After a reset (e.g. coming from the bootloader) boards with a fixed D+ pull-up
+ * need a nudge so the host sees the device again. */
+static void usb_reenumerate(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    GPIO_InitTypeDef gpio = {0};
+    gpio.Pin = GPIO_PIN_12;
+    gpio.Mode = GPIO_MODE_OUTPUT_PP;
+    gpio.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
+    HAL_GPIO_Init(GPIOA, &gpio);
+    HAL_Delay(20);
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_12);
+}
 
 /* USER CODE END 0 */
 
@@ -67,6 +82,8 @@ int main(void)
 {
     /* USER CODE BEGIN 1 */
 
+    /* The JKL bootloader sits below us: use our own vector table. */
+    SCB->VTOR = JKL_APP_BASE;
     /* USER CODE END 1 */
 
     /* MCU Configuration--------------------------------------------------------*/
@@ -87,6 +104,7 @@ int main(void)
 
     /* Initialize all configured peripherals */
     MX_GPIO_Init();
+    usb_reenumerate();
     MX_USB_DEVICE_Init();
     /* USER CODE BEGIN 2 */
 

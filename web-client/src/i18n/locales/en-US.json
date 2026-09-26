@@ -675,6 +675,30 @@
       "notChosen": "You'll be asked where to save files the first time.",
       "change": "Change",
       "choose": "Choose folder"
+    },
+    "firmware": {
+      "title": "Firmware update",
+      "menuDesc": "Check the burner's firmware and update it over USB",
+      "installed": "Installed on the burner",
+      "latest": "Latest firmware",
+      "unknown": "Not available",
+      "notConnected": "Connect the burner to check",
+      "checking": "Checking…",
+      "original": "Original firmware (no USB updates)",
+      "needsStLink": "This burner still has its original firmware, which can't update itself. Install the JKL firmware once with an ST-Link (flash the .hex file as it is); after that, updates work from here.",
+      "downloadFull": "Download the full firmware (.hex)",
+      "update": "Update to {version}",
+      "connectUpdater": "Select JKL GBA Burner Updater",
+      "chooseFile": "Use a .bin file…",
+      "fileChosen": "Using {name}.",
+      "restarting": "Restarting the burner into update mode…",
+      "selectUpdater": "The burner is in update mode (the light blinks slowly). Click the button and pick \"JKL GBA Burner Updater\".",
+      "writing": "Updating the firmware. Keep the burner plugged in…",
+      "done": "Firmware {version} installed. The burner restarts on its own; connect it again to use it.",
+      "noUpdaterPicked": "No updater was selected. If the light blinks slowly, click the button again and pick \"JKL GBA Burner Updater\".",
+      "failed": "The update did not finish: {reason}. The burner stays in update mode, so you can try again.",
+      "hint": "If an update is interrupted, the burner stays in update mode with a slowly blinking light; select the updater again to finish.",
+      "noWebSerial": "this browser can't talk to USB devices; use Chrome or Edge"
     }
   },
   "messages": {
