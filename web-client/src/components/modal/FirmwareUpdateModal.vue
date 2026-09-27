@@ -23,6 +23,31 @@
         {{ statusText }}
       </p>
 
+      <div
+        v-if="releases.length > 0"
+        class="whats-new"
+      >
+        <h4>{{ releasesTitle }}</h4>
+        <div
+          v-for="release in releases"
+          :key="release.version"
+          class="release"
+        >
+          <div class="release-head">
+            <span class="release-version">{{ release.version }}</span>
+            <span class="release-date">{{ release.released }}</span>
+          </div>
+          <ul>
+            <li
+              v-for="note in release.notes"
+              :key="note"
+            >
+              {{ note }}
+            </li>
+          </ul>
+        </div>
+      </div>
+
       <p
         v-if="needsStLink"
         class="note"
@@ -98,6 +123,7 @@ import {
   type FirmwareManifest,
   LATEST_FIRMWARE_MANIFEST,
   readFirmwareInfo,
+  releasesSince,
   restartIntoUpdater,
   UPDATER_PORT_FILTER,
   UpdaterSession,
@@ -141,6 +167,12 @@ const statusText = computed(() => {
   if (offered === current) return t('ui.firmware.statusCurrent');
   return t('ui.firmware.statusNewer', { version: imageVersion.value });
 });
+const releases = computed(() => latest.value
+  ? releasesSince(latest.value, installed.value?.version ?? null)
+  : []);
+const releasesTitle = computed(() => (offersUpgrade.value && imageVersion.value === latest.value?.version
+  ? t('ui.firmware.whatsNew')
+  : t('ui.firmware.whatsIn', { version: latest.value?.version ?? '' })));
 const installedText = computed(() => {
   if (!connected.value) return t('ui.firmware.notConnected');
   if (installed.value === undefined) return t('ui.firmware.checking');
@@ -273,6 +305,48 @@ function close() {
 .status.current {
   background: color-mix(in srgb, var(--color-success) 12%, transparent);
   color: var(--color-success);
+}
+
+.whats-new {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
+  border-radius: var(--radius-md);
+}
+
+.whats-new h4 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.release + .release {
+  margin-top: var(--space-3);
+}
+
+.release-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+}
+
+.release-version {
+  font-weight: var(--font-weight-semibold);
+}
+
+.release-date {
+  color: var(--color-text-secondary);
+}
+
+.release ul {
+  margin: var(--space-1) 0 0;
+  padding-left: 1.2em;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.release li + li {
+  margin-top: 2px;
 }
 
 .note,

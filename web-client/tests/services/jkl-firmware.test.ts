@@ -33,3 +33,25 @@ describe('JKL firmware updater', () => {
     expect(parseFirmwareInfo(new Uint8Array(64))).toBeNull();
   });
 });
+
+describe('firmware release notes', () => {
+  const manifest = {
+    version: '1.0.2', file: 'x.bin', size: 1, crc32: '0',
+    changelog: [
+      { version: '1.0.2', released: '2026-09-27', notes: ['b'] },
+      { version: '1.0.1', released: '2026-09-27', notes: ['a'] },
+    ],
+  };
+
+  it('lists every release after the installed one', async () => {
+    const { releasesSince } = await import('@/services/jkl-firmware');
+    expect(releasesSince(manifest, '1.0.0').map(r => r.version)).toEqual(['1.0.2', '1.0.1']);
+    expect(releasesSince(manifest, '1.0.1').map(r => r.version)).toEqual(['1.0.2']);
+  });
+
+  it('falls back to the latest release when up to date or unknown', async () => {
+    const { releasesSince } = await import('@/services/jkl-firmware');
+    expect(releasesSince(manifest, '1.0.2').map(r => r.version)).toEqual(['1.0.2']);
+    expect(releasesSince(manifest, null).map(r => r.version)).toEqual(['1.0.2']);
+  });
+});

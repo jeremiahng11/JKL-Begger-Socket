@@ -26,11 +26,33 @@ export interface BurnerFirmwareInfo {
   features: string[];
 }
 
+export interface FirmwareRelease {
+  version: string;
+  released: string;
+  notes: string[];
+}
+
 export interface FirmwareManifest {
   version: string;
   file: string;
   size: number;
   crc32: string;
+  changelog?: FirmwareRelease[];
+}
+
+/**
+ * What's new for a burner on `installedVersion`: every release after it, newest first.
+ * With nothing installed to compare against (or already up to date), the latest release.
+ */
+export function releasesSince(manifest: FirmwareManifest, installedVersion: string | null): FirmwareRelease[] {
+  const changelog = manifest.changelog ?? [];
+  if (installedVersion) {
+    const installed = versionNumber(installedVersion);
+    const newer = changelog.filter(release => versionNumber(release.version) > installed);
+    if (newer.length > 0) return newer;
+  }
+  const latest = changelog.find(release => release.version === manifest.version);
+  return latest ? [latest] : [];
 }
 
 /** The newest firmware the website offers, or null when it can't be loaded. */

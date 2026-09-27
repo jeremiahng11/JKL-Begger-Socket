@@ -7,7 +7,8 @@ Writes to OUT_DIR:
   jkl_gba_burner_full_vVERSION.hex   bootloader + firmware + info page, for a one-time
                                      ST-Link flash (the addresses are in the file)
   jkl_gba_burner_update_vVERSION.bin firmware only, for updating over USB
-  jkl_gba_burner_update.json         version, size and CRC-32 of that update
+  jkl_gba_burner_update.json         version, size and CRC-32 of that update, plus the
+                                     release notes from firmware-changelog.json
 
 The layout matches common/jkl_flash_layout.h.
 """
@@ -67,8 +68,17 @@ def main():
     update = os.path.join(out_dir, f"jkl_gba_burner_update_v{version}.bin")
     with open(update, "wb") as f:
         f.write(app)
-    with open(os.path.join(out_dir, "jkl_gba_burner_update.json"), "w") as f:
-        json.dump({"version": version, "file": os.path.basename(update), "size": len(app), "crc32": f"{crc:08x}"}, f, indent=2)
+    manifest = {"version": version, "file": os.path.basename(update), "size": len(app), "crc32": f"{crc:08x}"}
+    # Release notes for the website, newest first (mcu/firmware-changelog.json).
+    changelog_path = os.path.join(os.path.dirname(__file__), "..", "firmware-changelog.json")
+    if os.path.exists(changelog_path):
+        with open(changelog_path, encoding="utf-8") as f:
+            changelog = json.load(f)
+        if not any(entry["version"] == version for entry in changelog):
+            print(f"note: firmware-changelog.json has no entry for {version}")
+        manifest["changelog"] = changelog
+    with open(os.path.join(out_dir, "jkl_gba_burner_update.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2, ensure_ascii=False)
         f.write("\n")
     print(f"bootloader {len(boot)} B, firmware {len(app)} B, crc32 {crc:08x}")
     print(full)

@@ -2,5 +2,26 @@
   "version": "1.0.2",
   "file": "jkl_gba_burner_update_v1.0.2.bin",
   "size": 21228,
-  "crc32": "95e4ad49"
+  "crc32": "95e4ad49",
+  "changelog": [
+    {
+      "version": "1.0.2",
+      "released": "2026-09-27",
+      "notes": [
+        "Faster save reads: the burner sends each part of your save over USB while it reads the next part, so games start sooner.",
+        "Game Boy and Game Boy Color reads use the same faster method.",
+        "The burner now answers commands it doesn't know, instead of leaving the app waiting."
+      ]
+    },
+    {
+      "version": "1.0.1",
+      "released": "2026-09-27",
+      "notes": [
+        "Updates over USB from the website (Tools → Firmware update); no ST-Link needed after the first install.",
+        "The burner reports its name and firmware version to the website and the Android app.",
+        "Faster game (ROM) reads: about 20% quicker.",
+        "Shows up as \"JKL GBA Burner\"."
+      ]
+    }
+  ]
 }

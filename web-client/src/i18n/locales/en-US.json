@@ -706,7 +706,10 @@
       "reinstall": "Reinstall {version}",
       "statusUpdate": "Update available: {version}",
       "statusCurrent": "Your burner is up to date.",
-      "statusNewer": "Your burner has a newer firmware than {version}."
+      "statusNewer": "Your burner has a newer firmware than {version}.",
+      "whatsNew": "What's new",
+      "whatsIn": "What's in {version}",
+      "bannerNew": "New:"
     }
   },
   "messages": {

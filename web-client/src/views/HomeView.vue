@@ -55,7 +55,13 @@
       v-if="firmwareUpdate"
       class="firmware-banner"
     >
-      <span>{{ $t('ui.firmware.banner', firmwareUpdate) }}</span>
+      <div class="firmware-banner-text">
+        <span>{{ $t('ui.firmware.banner', firmwareUpdate) }}</span>
+        <span
+          v-if="firmwareUpdate.headline"
+          class="firmware-banner-headline"
+        >{{ $t('ui.firmware.bannerNew') }} {{ firmwareUpdate.headline }}</span>
+      </div>
       <div class="firmware-banner-actions">
         <BaseButton
           variant="primary"
@@ -112,7 +118,7 @@ import DebugLink from '@/components/link/DebugLink.vue';
 import FirmwareUpdateModal from '@/components/modal/FirmwareUpdateModal.vue';
 import MorseBorder from '@/components/MorseBorder.vue';
 import { useToast } from '@/composables/useToast';
-import { type BurnerFirmwareInfo, fetchLatestFirmware, readFirmwareInfo, versionNumber } from '@/services/jkl-firmware';
+import { type BurnerFirmwareInfo, fetchLatestFirmware, readFirmwareInfo, releasesSince, versionNumber } from '@/services/jkl-firmware';
 import { DebugSettings } from '@/settings/debug-settings';
 import { DeviceInfo } from '@/types/device-info';
 
@@ -123,7 +129,7 @@ const device = ref<DeviceInfo | null>(null);
 // The connected burner's firmware: undefined until asked, null for firmware without version info.
 const burnerFirmware = ref<BurnerFirmwareInfo | null | undefined>(undefined);
 // Set when the connected burner has older firmware than the website offers.
-const firmwareUpdate = ref<{ installed: string; latest: string } | null>(null);
+const firmwareUpdate = ref<{ installed: string; latest: string; headline: string } | null>(null);
 const showFirmwareUpdate = ref(false);
 const burnerBadge = computed((): string => {
   if (!device.value || burnerFirmware.value === undefined) return '';
@@ -194,7 +200,10 @@ async function checkBurnerFirmware(dev: DeviceInfo) {
   const newer = latest && (!installed || versionNumber(latest.version) > versionNumber(installed.version));
   getCartBurnerExpose()?.logBurnerFirmware(installed, newer ? latest.version : null);
   // Burners with the original firmware can't update over USB, so only offer JKL ones.
-  if (newer && installed?.bootloader) firmwareUpdate.value = { installed: installed.version, latest: latest.version };
+  if (newer && installed?.bootloader) {
+    const headline = releasesSince(latest, installed.version)[0]?.notes[0] ?? '';
+    firmwareUpdate.value = { installed: installed.version, latest: latest.version, headline };
+  }
 }
 
 /**
@@ -459,6 +468,17 @@ $title-color: #2c3e50;
   color: var(--color-text);
   font-size: typography-vars.$font-size-sm;
   font-weight: typography-vars.$font-weight-medium;
+}
+
+.firmware-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.firmware-banner-headline {
+  color: var(--color-text-secondary);
+  font-weight: typography-vars.$font-weight-normal;
 }
 
 .firmware-banner-actions {
