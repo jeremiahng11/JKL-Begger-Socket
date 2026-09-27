@@ -691,6 +691,7 @@
       "romSizeQueryFailed": "ROM容量查询失败",
       "cfiParseSuccess": "CFI解析成功",
       "cfiParseFailed": "CFI解析失败",
+      "noFlashChipAnswered": "未检测到闪存芯片，正在按原装卡带识别",
       "eraseSectorFailed": "扇区擦除失败",
       "eraseSummary": "擦除完成 - 总耗时: {totalTime}, 平均速度: {avgSpeed}, 最高速度: {maxSpeed}, 总扇区数: {totalSectors}"
     },

@@ -768,6 +768,7 @@
       "romSizeQueryFailed": "ROM capacity query failed",
       "cfiParseSuccess": "CFI parsing successful",
       "cfiParseFailed": "CFI parsing failed",
+      "noFlashChipAnswered": "No flash chip answered, checking for an original cartridge",
       "eraseSectorFailed": "Sector erase failed",
       "eraseSummary": "Erase completed - Total time: {totalTime}, Average speed: {avgSpeed}, Max speed: {maxSpeed}, Total sectors: {totalSectors}",
       "readOnlyCartDetected": "No flash chip found, so this is treated as an original (read-only) cartridge. Read ROM, the save panel and Play work; ROM writing is disabled.",

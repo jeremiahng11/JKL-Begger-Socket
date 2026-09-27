@@ -680,6 +680,7 @@
       "romSizeQueryFailed": "ROM容量問い合わせ失敗",
       "cfiParseSuccess": "CFI解析成功",
       "cfiParseFailed": "CFI解析失敗",
+      "noFlashChipAnswered": "フラッシュチップの応答がありません。純正カートリッジか確認しています",
       "eraseSectorFailed": "セクター消去失敗",
       "eraseSummary": "消去完了 - 総時間: {totalTime}, 平均速度: {avgSpeed}, 最高速度: {maxSpeed}, 総セクター数: {totalSectors}"
     },

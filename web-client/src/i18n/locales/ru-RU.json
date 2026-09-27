@@ -678,6 +678,7 @@
       "romSizeQueryFailed": "Ошибка запроса размера ROM",
       "cfiParseSuccess": "CFI разбор успешен",
       "cfiParseFailed": "Ошибка CFI разбора",
+      "noFlashChipAnswered": "Флеш-чип не ответил, проверяем оригинальный картридж",
       "eraseSectorFailed": "Ошибка стирания сектора",
       "eraseSummary": "Стирание завершено - общее время: {totalTime}, средняя скорость: {avgSpeed}, максимальная скорость: {maxSpeed}, общее количество секторов: {totalSectors}"
     },

@@ -1549,7 +1549,8 @@ export class GBAAdapter extends CartridgeAdapter {
           const cfiInfo = parseCFI(cfiData);
 
           if (!cfiInfo) {
-            this.log(this.t('messages.operation.cfiParseFailed'), 'error');
+            // Normal for original cartridges, which have no flash chip to answer.
+            this.log(this.t('messages.operation.noFlashChipAnswered'), 'info');
             return false;
           }
 

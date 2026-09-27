@@ -655,6 +655,7 @@
       "romSizeQueryFailed": "ROM容量查詢失敗",
       "cfiParseSuccess": "CFI解析成功",
       "cfiParseFailed": "CFI解析失敗",
+      "noFlashChipAnswered": "未偵測到快閃記憶體晶片，正在按原裝卡帶識別",
       "eraseSectorFailed": "扇區擦除失敗",
       "eraseSummary": "擦除完成 - 總耗時: {totalTime}, 平均速度: {avgSpeed}, 最高速度: {maxSpeed}, 總扇區數: {totalSectors}"
     },

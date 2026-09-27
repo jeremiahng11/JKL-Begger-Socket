@@ -452,12 +452,24 @@ async function ensureCartInfo(adapter: BurnerProtocolSession): Promise<CFIInfo |
       if (result.romSizeHex) onRomSizeChange(result.romSizeHex);
       log(result.message, 'success');
     } else if (mode.value === 'GBA') {
-      cfiInfo.value = createReadOnlyCartInfo();
-      onRomSizeChange(formatHex(GBA_MAX_ROM_SIZE, 4));
-      log(t('messages.operation.readOnlyCartDetected'), 'info');
+      await useReadOnlyCartInfo(adapter);
     }
     return cfiInfo.value;
   });
+}
+
+/** An original cartridge: read-only chip info, and the ROM size set to the game's real size. */
+async function useReadOnlyCartInfo(adapter: BurnerProtocolSession) {
+  const info = createReadOnlyCartInfo();
+  cfiInfo.value = info;
+  const size = await detectRomSize(adapter, {
+    baseAddress: parseInt(selectedBaseAddress.value, 16),
+    cfiInfo: info,
+    mbcType: selectedMbcType.value,
+    enable5V: mbcPower5V.value,
+  }, GBA_MAX_ROM_SIZE);
+  onRomSizeChange(formatHex(size ?? GBA_MAX_ROM_SIZE, 4));
+  log(t('messages.operation.readOnlyCartDetected'), 'info');
 }
 
 async function readCart() {
@@ -481,10 +493,8 @@ async function readCart() {
           log(result.message, 'success');
         } else if (mode.value === 'GBA') {
           // Original cartridges have no flash chip to identify; they can still be read.
-          cfiInfo.value = createReadOnlyCartInfo();
-          onRomSizeChange(formatHex(GBA_MAX_ROM_SIZE, 4));
+          await useReadOnlyCartInfo(adapter);
           showToast(t('messages.operation.readOnlyCartDetected'), 'info');
-          log(t('messages.operation.readOnlyCartDetected'), 'info');
         } else {
           showToast(result.message, 'error');
           log(result.message, 'error');
