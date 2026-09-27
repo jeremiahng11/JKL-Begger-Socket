@@ -698,7 +698,8 @@
       "noUpdaterPicked": "No updater was selected. If the light blinks slowly, click the button again and pick \"JKL GBA Burner Updater\".",
       "failed": "The update did not finish: {reason}. The burner stays in update mode, so you can try again.",
       "hint": "If an update is interrupted, the burner stays in update mode with a slowly blinking light; select the updater again to finish.",
-      "noWebSerial": "this browser can't talk to USB devices; use Chrome or Edge"
+      "noWebSerial": "this browser can't talk to USB devices; use Chrome or Edge",
+      "badgeOriginal": "Burner: original firmware"
     }
   },
   "messages": {
@@ -993,6 +994,12 @@
       "saveUnchanged": "No new progress to save",
       "readOnlyCart": "No flash chip detected, so this looks like an original cartridge. Reading it directly.",
       "romSize": "Game size on the cartridge: {size}"
+    },
+    "firmware": {
+      "detected": "Burner firmware: {name} {version}",
+      "original": "Burner firmware: original (it doesn't report a version and can't update over USB)",
+      "updateAvailable": "Burner firmware {version} is available: Tools → Firmware update",
+      "installJkl": "JKL burner firmware {version} adds USB updates and faster reads: Tools → Firmware update"
     }
   }
 }

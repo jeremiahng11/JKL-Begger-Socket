@@ -33,6 +33,16 @@ export interface FirmwareManifest {
   crc32: string;
 }
 
+/** The newest firmware the website offers, or null when it can't be loaded. */
+export async function fetchLatestFirmware(): Promise<FirmwareManifest | null> {
+  try {
+    const response = await fetch(new URL(LATEST_FIRMWARE_MANIFEST, document.baseURI), { cache: 'no-store' });
+    return response.ok ? await response.json() as FirmwareManifest : null;
+  } catch {
+    return null;
+  }
+}
+
 /** A burner command with no arguments: [size:2][cmd][crc:2]. */
 function simpleCommand(cmd: number): Uint8Array {
   return new Uint8Array([5, 0, cmd, 0, 0]);

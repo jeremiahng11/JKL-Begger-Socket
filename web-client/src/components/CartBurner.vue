@@ -153,6 +153,7 @@ import { createCartridgeProtocolSession } from '@/features/burner/adapters';
 import { type BurnerProtocolSession, createBurnerFacade, type GameDetectionResult } from '@/features/burner/application';
 import { prepareSaveFolder } from '@/platform/save-folder';
 import { CartridgeAdapter, GBAAdapter, MBC5Adapter } from '@/services';
+import type { BurnerFirmwareInfo } from '@/services/jkl-firmware';
 import { AdvancedSettings } from '@/settings/advanced-settings';
 import { useRecentFileNamesStore } from '@/stores/recent-file-names-store';
 import { CommandOptions, DeviceInfo } from '@/types';
@@ -1371,7 +1372,23 @@ onUnmounted(() => {
 });
 
 // 暴露方法供父组件调用
+function logBurnerFirmware(installed: BurnerFirmwareInfo | null, latestVersion: string | null) {
+  if (installed) {
+    log(t('messages.firmware.detected', { name: installed.name, version: installed.version }), 'info');
+  } else {
+    log(t('messages.firmware.original'), 'info');
+  }
+  if (latestVersion) {
+    const message = installed
+      ? t('messages.firmware.updateAvailable', { version: latestVersion })
+      : t('messages.firmware.installJkl', { version: latestVersion });
+    log(message, 'warn');
+    if (installed) showToast(message, 'info');
+  }
+}
+
 defineExpose({
+  logBurnerFirmware,
   logDeviceFirmwareProfile,
   resetState,
 });

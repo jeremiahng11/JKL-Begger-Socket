@@ -23,7 +23,10 @@
             :class="{ 'title-badge--build-info': !isReleaseBuild }"
             rel="noopener noreferrer"
           >
-            <template v-if="isReleaseBuild">
+            <template v-if="burnerBadge">
+              {{ burnerBadge }}
+            </template>
+            <template v-else-if="isReleaseBuild">
               for beggar_socket
             </template>
             <template v-else>
@@ -82,6 +85,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher.vue';
 import DebugLink from '@/components/link/DebugLink.vue';
 import MorseBorder from '@/components/MorseBorder.vue';
 import { useToast } from '@/composables/useToast';
+import { type BurnerFirmwareInfo, fetchLatestFirmware, readFirmwareInfo, versionNumber } from '@/services/jkl-firmware';
 import { DebugSettings } from '@/settings/debug-settings';
 import { DeviceInfo } from '@/types/device-info';
 
@@ -89,6 +93,12 @@ const { showToast } = useToast();
 const { t } = useI18n();
 
 const device = ref<DeviceInfo | null>(null);
+// The connected burner's firmware: undefined until asked, null for firmware without version info.
+const burnerFirmware = ref<BurnerFirmwareInfo | null | undefined>(undefined);
+const burnerBadge = computed((): string => {
+  if (!device.value || burnerFirmware.value === undefined) return '';
+  return burnerFirmware.value ? `Burner v${burnerFirmware.value.version}` : t('ui.firmware.badgeOriginal');
+});
 const deviceReady = ref(false);
 const showDebugPanelModal = ref(false);
 const currentMode = ref<'MBC5' | 'GBA'>('GBA');
@@ -100,6 +110,7 @@ const deviceConnectRef = useTemplateRef<InstanceType<typeof DeviceConnect>>('dev
 const cartBurnerRef = useTemplateRef<InstanceType<typeof CartBurner>>('cartBurnerRef');
 
 interface CartBurnerExpose {
+  logBurnerFirmware: (installed: BurnerFirmwareInfo | null, latestVersion: string | null) => void;
   logDeviceFirmwareProfile: (deviceInfo: DeviceInfo) => void;
   resetState: () => void;
 }
@@ -139,6 +150,18 @@ function onDeviceReady(dev: DeviceInfo) {
   device.value = dev;
   deviceReady.value = true;
   getCartBurnerExpose()?.logDeviceFirmwareProfile(dev);
+  void checkBurnerFirmware(dev);
+}
+
+/** Asks the burner for its firmware version and points out a newer one. */
+async function checkBurnerFirmware(dev: DeviceInfo) {
+  burnerFirmware.value = undefined;
+  if (!dev.transport || dev.serialHandle?.platform === 'simulated') return;
+  const [installed, latest] = await Promise.all([readFirmwareInfo(dev.transport), fetchLatestFirmware()]);
+  if (device.value !== dev) return;
+  burnerFirmware.value = installed;
+  const newer = latest && (!installed || versionNumber(latest.version) > versionNumber(installed.version));
+  getCartBurnerExpose()?.logBurnerFirmware(installed, newer ? latest.version : null);
 }
 
 /**
@@ -146,6 +169,7 @@ function onDeviceReady(dev: DeviceInfo) {
  */
 function onDeviceDisconnected() {
   device.value = null;
+  burnerFirmware.value = undefined;
   deviceReady.value = false;
 }
 

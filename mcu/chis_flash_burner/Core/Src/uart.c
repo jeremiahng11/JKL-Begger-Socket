@@ -10,6 +10,7 @@
 
 #define BATCH_SIZE_RW 512
 #define BATCH_SIZE_RESPON 512
+#define ROM_READ_PIPE_WORDS 256  // 512 bytes read from the cartridge per USB hand-off
 
 #define SIZE_CMD_HEADER 3
 #define SIZE_RESPON_HEADER 2
@@ -541,11 +542,26 @@ static void romRead()
     // 数据
     uint16_t *dataBuf = (uint16_t *)uart_respon->payload;
 
-    cart_romRead(wordAddress, dataBuf, wordCount);
-
-    // 返回数据
     uart_clearRecvBuf();
-    uart_responData(NULL, byteCount);
+
+    // JKL 1.1.2: read the cartridge in pieces and hand each piece to USB right away,
+    // so the next piece is read while the previous one is still being sent.
+    const USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
+    uint16_t wordsDone = 0;
+    uint16_t bytesSent = 0;  // of the response: 2 bytes CRC field + data
+    while (wordsDone < wordCount) {
+        uint16_t words = wordCount - wordsDone;
+        if (words > ROM_READ_PIPE_WORDS) words = ROM_READ_PIPE_WORDS;
+        cart_romRead(wordAddress + wordsDone, dataBuf + wordsDone, words);
+        wordsDone += words;
+
+        while (hcdc->TxState != 0) {
+        }
+        uint16_t ready = SIZE_CRC + wordsDone * 2;
+        CDC_Transmit_FS(responBuf + bytesSent, ready - bytesSent);
+        bytesSent = ready;
+    }
+    if (wordCount == 0) uart_responData(NULL, 0);
 }
 
 // ram写入
