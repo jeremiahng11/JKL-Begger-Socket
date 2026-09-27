@@ -10,7 +10,8 @@
 
 #define BATCH_SIZE_RW 512
 #define BATCH_SIZE_RESPON 512
-#define ROM_READ_PIPE_WORDS 256  // 512 bytes read from the cartridge per USB hand-off
+#define READ_PIPE_BYTES 512  // read from the cartridge per USB hand-off
+#define REPLY_UNKNOWN_COMMAND 0xee
 
 #define SIZE_CMD_HEADER 3
 #define SIZE_RESPON_HEADER 2
@@ -148,6 +149,19 @@ static void uart_responData(const uint8_t *dat, uint16_t len)
     }
 }
 
+static void uart_responByte(uint8_t value)
+{
+    const USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
+
+    while (hcdc->TxState != 0) {
+        __WFI();  // Wait for interrupt
+    }
+
+    static uint8_t reply;
+    reply = value;
+    CDC_Transmit_FS(&reply, 1);
+}
+
 static void uart_responAck()
 {
     const USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
@@ -275,7 +289,9 @@ void uart_cmdHandler()
 
         default:
             // 未知命令，清除缓冲区避免busy死锁
+            // JKL 1.0.2: say so (one byte 0xee) instead of leaving the host to time out.
             uart_clearRecvBuf();
+            uart_responByte(REPLY_UNKNOWN_COMMAND);
             break;
     }
 
@@ -529,39 +545,79 @@ static void romWrite()
 // rom 读取透传
 // i 2B.包大小 0xf6 4B.始地址 2B.读取数量 2B.CRC
 // o 2B.CRC nB.数据
+// JKL: stream a read reply. Each piece is read from the cartridge and handed to
+// USB right away, so the next piece is read while the previous one is sent. The
+// cartridge sees exactly the same accesses as reading everything first.
+typedef void (*piece_reader_t)(uint16_t offset, uint16_t count, uint8_t *dst);
+
+static uint32_t pipeBase;
+static uint8_t pipeLatency;
+
+static void uart_responPipelined(uint16_t byteCount, uint16_t pieceBytes, piece_reader_t readPiece)
+{
+    if (byteCount == 0) {
+        uart_responData(NULL, 0);
+        return;
+    }
+    const USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
+    uint16_t done = 0;
+    uint16_t sent = 0;  // of the reply: 2 bytes CRC field + data
+    while (done < byteCount) {
+        uint16_t count = byteCount - done;
+        if (count > pieceBytes) count = pieceBytes;
+        readPiece(done, count, uart_respon->payload + done);
+        done += count;
+
+        while (hcdc->TxState != 0) {
+        }
+        uint16_t ready = SIZE_CRC + done;
+        CDC_Transmit_FS(responBuf + sent, ready - sent);
+        sent = ready;
+    }
+}
+
+static void readRomPiece(uint16_t offset, uint16_t count, uint8_t *dst)
+{
+    cart_romRead(pipeBase + offset / 2, (uint16_t *)dst, count / 2);
+}
+
+static void readRamPiece(uint16_t offset, uint16_t count, uint8_t *dst)
+{
+    cart_ramRead((uint16_t)(pipeBase + offset), dst, count);
+}
+
+static void readRamPieceFram(uint16_t offset, uint16_t count, uint8_t *dst)
+{
+    for (int i = 0; i < count; i++) {
+        cart_ramRead((uint16_t)(pipeBase + offset + i), dst + i, 1);  // 逐个字节读
+        for (int ii = 0; ii < pipeLatency; ii++) __NOP();
+    }
+}
+
+static void readGbcPiece(uint16_t offset, uint16_t count, uint8_t *dst)
+{
+    cart_gbcRead((uint16_t)(pipeBase + offset), dst, count);
+}
+
+static void readGbcPieceFram(uint16_t offset, uint16_t count, uint8_t *dst)
+{
+    for (int i = 0; i < count; i++) {
+        cart_gbcRead((uint16_t)(pipeBase + offset + i), dst + i, 1);  // 逐个字节读
+        for (int ii = 0; ii < pipeLatency; ii++) __NOP();
+    }
+}
+
 static void romRead()
 {
     const Desc_cmdBody_read_t *desc_read = (Desc_cmdBody_read_t *)(uart_cmd->payload);
 
-    // 基地址
-    uint32_t baseAddress = desc_read->baseAddress;
-    uint32_t wordAddress = baseAddress >> 1;
+    // 基地址 (the ROM is addressed in 16-bit words)
+    pipeBase = desc_read->baseAddress >> 1;
     // 读取总数量
     uint16_t byteCount = desc_read->readSize;
-    uint16_t wordCount = byteCount / 2;
-    // 数据
-    uint16_t *dataBuf = (uint16_t *)uart_respon->payload;
 
     uart_clearRecvBuf();
-
-    // JKL 1.1.2: read the cartridge in pieces and hand each piece to USB right away,
-    // so the next piece is read while the previous one is still being sent.
-    const USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
-    uint16_t wordsDone = 0;
-    uint16_t bytesSent = 0;  // of the response: 2 bytes CRC field + data
-    while (wordsDone < wordCount) {
-        uint16_t words = wordCount - wordsDone;
-        if (words > ROM_READ_PIPE_WORDS) words = ROM_READ_PIPE_WORDS;
-        cart_romRead(wordAddress + wordsDone, dataBuf + wordsDone, words);
-        wordsDone += words;
-
-        while (hcdc->TxState != 0) {
-        }
-        uint16_t ready = SIZE_CRC + wordsDone * 2;
-        CDC_Transmit_FS(responBuf + bytesSent, ready - bytesSent);
-        bytesSent = ready;
-    }
-    if (wordCount == 0) uart_responData(NULL, 0);
+    uart_responPipelined(byteCount, READ_PIPE_BYTES, readRomPiece);
 }
 
 // ram写入
@@ -601,27 +657,13 @@ static void ramRead()
 {
     const Desc_cmdBody_read_t *desc_read = (Desc_cmdBody_read_t *)(uart_cmd->payload);
 
-    // 基地址
-    uint32_t baseAddress = desc_read->baseAddress;
+    // 基地址 (切bank操作由上位机完成)
+    pipeBase = desc_read->baseAddress;
     // 读取总数量
     uint16_t byteCount = desc_read->readSize;
-    // 数据
-    uint8_t *dataBuf = uart_respon->payload;
 
-    // 切bank操作移至上位机完成
-    // // 切bank
-    // uint16_t bank;
-    // if (baseAddress & 0xffff0000)
-    //     bank = 1;
-    // else
-    //     bank = 0;
-    // cart_romWrite(0x800000, &bank, 1);
-
-    cart_ramRead((uint16_t)baseAddress, dataBuf, byteCount);
-
-    // 返回数据
     uart_clearRecvBuf();
-    uart_responData(NULL, byteCount);
+    uart_responPipelined(byteCount, READ_PIPE_BYTES, readRamPiece);
 }
 
 static void ramProgramFlash()
@@ -686,24 +728,13 @@ void ramRead_forFram()
 {
     Desc_cmdBody_read_t *desc_read = (Desc_cmdBody_read_t *)(uart_cmd->payload);
 
-    // 基地址
-    uint32_t baseAddress = desc_read->baseAddress;
-    // 读取总数量
+    pipeBase = desc_read->baseAddress;
     uint16_t byteCount = desc_read->readSize;
     // 延迟周期
-    uint8_t latency = uart_cmd->payload[SIZE_BASE_ADDRESS + SIZE_BYTE_COUNT];
-    // 数据
-    uint8_t *dataBuf = uart_respon->payload;
+    pipeLatency = uart_cmd->payload[SIZE_BASE_ADDRESS + SIZE_BYTE_COUNT];
 
-    for (int i = 0; i < byteCount; i++) {
-        cart_ramRead((uint16_t)(baseAddress + i), dataBuf + i, 1);  // 逐个字节读
-
-        for (int ii = 0; ii < latency; ii++) __NOP();
-    }
-
-    // 返回数据
     uart_clearRecvBuf();
-    uart_responData(NULL, byteCount);
+    uart_responPipelined(byteCount, READ_PIPE_BYTES, readRamPieceFram);
 }
 ////////////////////////////////////////////////////////////
 /// 下面是gbc的功能
@@ -731,18 +762,11 @@ static void gbcRead()
 {
     const Desc_cmdBody_read_t *desc_read = (Desc_cmdBody_read_t *)(uart_cmd->payload);
 
-    // 基地址
-    uint32_t baseAddress = desc_read->baseAddress;
-    // 读取总数量
+    pipeBase = desc_read->baseAddress;
     uint16_t byteCount = desc_read->readSize;
-    // 数据
-    uint8_t *dataBuf = uart_respon->payload;
 
-    cart_gbcRead((uint16_t)baseAddress, dataBuf, byteCount);
-
-    // 返回数据
     uart_clearRecvBuf();
-    uart_responData(NULL, byteCount);
+    uart_responPipelined(byteCount, READ_PIPE_BYTES, readGbcPiece);
 }
 
 
@@ -863,24 +887,13 @@ void gbcRead_forFram()
 {
     Desc_cmdBody_read_t *desc_read = (Desc_cmdBody_read_t *)(uart_cmd->payload);
 
-    // 基地址
-    uint32_t baseAddress = desc_read->baseAddress;
-    // 读取总数量
+    pipeBase = desc_read->baseAddress;
     uint16_t byteCount = desc_read->readSize;
     // 延迟周期
-    uint8_t latency = uart_cmd->payload[SIZE_BASE_ADDRESS + SIZE_BYTE_COUNT];
-    // 数据
-    uint8_t *dataBuf = uart_respon->payload;
+    pipeLatency = uart_cmd->payload[SIZE_BASE_ADDRESS + SIZE_BYTE_COUNT];
 
-    for (int i = 0; i < byteCount; i++) {
-        cart_gbcRead((uint16_t)(baseAddress + i), dataBuf + i, 1);  // 逐个字节读
-
-        for (int ii = 0; ii < latency; ii++) __NOP();
-    }
-
-    // 返回数据
     uart_clearRecvBuf();
-    uart_responData(NULL, byteCount);
+    uart_responPipelined(byteCount, READ_PIPE_BYTES, readGbcPieceFram);
 }
 
 // JKL: firmware info
