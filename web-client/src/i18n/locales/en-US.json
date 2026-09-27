@@ -699,7 +699,14 @@
       "failed": "The update did not finish: {reason}. The burner stays in update mode, so you can try again.",
       "hint": "If an update is interrupted, the burner stays in update mode with a slowly blinking light; select the updater again to finish.",
       "noWebSerial": "this browser can't talk to USB devices; use Chrome or Edge",
-      "badgeOriginal": "Burner: original firmware"
+      "badgeOriginal": "Burner: original firmware",
+      "banner": "Burner firmware {latest} is available (your burner has {installed}).",
+      "updateNow": "Update now",
+      "later": "Later",
+      "reinstall": "Reinstall {version}",
+      "statusUpdate": "Update available: {version}",
+      "statusCurrent": "Your burner is up to date.",
+      "statusNewer": "Your burner has a newer firmware than {version}."
     }
   },
   "messages": {

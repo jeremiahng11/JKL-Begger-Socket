@@ -16,6 +16,14 @@
       </div>
 
       <p
+        v-if="statusText"
+        class="status"
+        :class="statusKind"
+      >
+        {{ statusText }}
+      </p>
+
+      <p
         v-if="needsStLink"
         class="note"
       >
@@ -46,9 +54,9 @@
       <div class="actions">
         <BaseButton
           v-if="stage === 'ready' && canRestart"
-          variant="primary"
           :disabled="!image || busy"
-          :text="$t('ui.firmware.update', { version: imageVersion })"
+          :variant="offersUpgrade ? 'primary' : 'secondary'"
+          :text="$t(offersUpgrade ? 'ui.firmware.update' : 'ui.firmware.reinstall', { version: imageVersion })"
           @click="startUpdate"
         />
         <BaseButton
@@ -93,6 +101,7 @@ import {
   restartIntoUpdater,
   UPDATER_PORT_FILTER,
   UpdaterSession,
+  versionNumber,
 } from '@/services/jkl-firmware';
 import type { DeviceInfo } from '@/types/device-info';
 
@@ -120,6 +129,18 @@ const needsStLink = computed(() => connected.value && installed.value === null);
 const fullImageUrl = computed(() => latest.value
   ? new URL(`firmware/jkl_gba_burner_full_v${latest.value.version}.hex`, document.baseURI).href
   : '#');
+// The firmware ready to install (the website's latest, or a file picked by hand) is newer.
+const offersUpgrade = computed(() => Boolean(installed.value && imageVersion.value &&
+  versionNumber(imageVersion.value) > versionNumber(installed.value.version)));
+const statusKind = computed(() => (offersUpgrade.value ? 'update' : 'current'));
+const statusText = computed(() => {
+  if (!installed.value || !imageVersion.value || stage.value !== 'ready') return '';
+  const current = versionNumber(installed.value.version);
+  const offered = versionNumber(imageVersion.value);
+  if (offered > current) return t('ui.firmware.statusUpdate', { version: imageVersion.value });
+  if (offered === current) return t('ui.firmware.statusCurrent');
+  return t('ui.firmware.statusNewer', { version: imageVersion.value });
+});
 const installedText = computed(() => {
   if (!connected.value) return t('ui.firmware.notConnected');
   if (installed.value === undefined) return t('ui.firmware.checking');
@@ -234,6 +255,24 @@ function close() {
 .value {
   font-weight: var(--font-weight-semibold);
   text-align: right;
+}
+
+.status {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.status.update {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
+.status.current {
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
 }
 
 .note,

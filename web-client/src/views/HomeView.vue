@@ -51,6 +51,31 @@
         :letter-spacing="12"
       />
     </div>
+    <div
+      v-if="firmwareUpdate"
+      class="firmware-banner"
+    >
+      <span>{{ $t('ui.firmware.banner', firmwareUpdate) }}</span>
+      <div class="firmware-banner-actions">
+        <BaseButton
+          variant="primary"
+          size="sm"
+          :text="$t('ui.firmware.updateNow')"
+          @click="showFirmwareUpdate = true"
+        />
+        <button
+          type="button"
+          class="firmware-banner-later"
+          @click="firmwareUpdate = null"
+        >
+          {{ $t('ui.firmware.later') }}
+        </button>
+      </div>
+    </div>
+    <FirmwareUpdateModal
+      v-model="showFirmwareUpdate"
+      :device="device"
+    />
     <CartBurner
       ref="cartBurnerRef"
       :device-ready="deviceReady"
@@ -79,10 +104,12 @@ import { useI18n } from 'vue-i18n';
 
 import CartBurner from '@/components/CartBurner.vue';
 import AppMenu from '@/components/common/AppMenu.vue';
+import BaseButton from '@/components/common/BaseButton.vue';
 import DebugPanel from '@/components/DebugPanel.vue';
 import DeviceConnect from '@/components/DeviceConnect.vue';
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue';
 import DebugLink from '@/components/link/DebugLink.vue';
+import FirmwareUpdateModal from '@/components/modal/FirmwareUpdateModal.vue';
 import MorseBorder from '@/components/MorseBorder.vue';
 import { useToast } from '@/composables/useToast';
 import { type BurnerFirmwareInfo, fetchLatestFirmware, readFirmwareInfo, versionNumber } from '@/services/jkl-firmware';
@@ -95,6 +122,9 @@ const { t } = useI18n();
 const device = ref<DeviceInfo | null>(null);
 // The connected burner's firmware: undefined until asked, null for firmware without version info.
 const burnerFirmware = ref<BurnerFirmwareInfo | null | undefined>(undefined);
+// Set when the connected burner has older firmware than the website offers.
+const firmwareUpdate = ref<{ installed: string; latest: string } | null>(null);
+const showFirmwareUpdate = ref(false);
 const burnerBadge = computed((): string => {
   if (!device.value || burnerFirmware.value === undefined) return '';
   return burnerFirmware.value ? `Burner v${burnerFirmware.value.version}` : t('ui.firmware.badgeOriginal');
@@ -156,12 +186,15 @@ function onDeviceReady(dev: DeviceInfo) {
 /** Asks the burner for its firmware version and points out a newer one. */
 async function checkBurnerFirmware(dev: DeviceInfo) {
   burnerFirmware.value = undefined;
+  firmwareUpdate.value = null;
   if (!dev.transport || dev.serialHandle?.platform === 'simulated') return;
   const [installed, latest] = await Promise.all([readFirmwareInfo(dev.transport), fetchLatestFirmware()]);
   if (device.value !== dev) return;
   burnerFirmware.value = installed;
   const newer = latest && (!installed || versionNumber(latest.version) > versionNumber(installed.version));
   getCartBurnerExpose()?.logBurnerFirmware(installed, newer ? latest.version : null);
+  // Burners with the original firmware can't update over USB, so only offer JKL ones.
+  if (newer && installed?.bootloader) firmwareUpdate.value = { installed: installed.version, latest: latest.version };
 }
 
 /**
@@ -170,6 +203,7 @@ async function checkBurnerFirmware(dev: DeviceInfo) {
 function onDeviceDisconnected() {
   device.value = null;
   burnerFirmware.value = undefined;
+  firmwareUpdate.value = null;
   deviceReady.value = false;
 }
 
@@ -408,6 +442,39 @@ $title-color: #2c3e50;
     @include mixins.gradient(135deg, #ffa726 0%, #ffe082 100%);
     box-shadow: 0 6px 14px rgba(255, 138, 0, 0.55);
   }
+}
+
+.firmware-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: spacing-vars.$space-3;
+  max-width: 1520px;
+  margin: spacing-vars.$space-3 auto 0;
+  padding: spacing-vars.$space-3 spacing-vars.$space-4;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-text);
+  font-size: typography-vars.$font-size-sm;
+  font-weight: typography-vars.$font-weight-medium;
+}
+
+.firmware-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: spacing-vars.$space-3;
+}
+
+.firmware-banner-later {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .branch-name {

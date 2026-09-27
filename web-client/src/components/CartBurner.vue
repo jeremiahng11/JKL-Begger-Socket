@@ -1383,7 +1383,6 @@ function logBurnerFirmware(installed: BurnerFirmwareInfo | null, latestVersion: 
       ? t('messages.firmware.updateAvailable', { version: latestVersion })
       : t('messages.firmware.installJkl', { version: latestVersion });
     log(message, 'warn');
-    if (installed) showToast(message, 'info');
   }
 }
 
