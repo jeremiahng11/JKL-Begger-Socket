@@ -145,7 +145,7 @@ set(PROJECT_DEFINES
 )
 
 # JKL firmware version: reported by command 0xb0 and stored by the bootloader.
-set(JKL_FW_VERSION "1.1.2")
+set(JKL_FW_VERSION "1.0.1")
 list(APPEND PROJECT_DEFINES "-DJKL_FW_VERSION_STR=\"${JKL_FW_VERSION}\"")
 
 # Add build timestamp
