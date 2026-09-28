@@ -672,7 +672,7 @@
     },
     "saveFolder": {
       "savesTo": "Files are saved to",
-      "notChosen": "You'll be asked where to save files the first time.",
+      "notChosen": "You'll be asked where to save files the first time. Pick a folder inside Downloads, such as a new \"JKL Burner\" folder: Chrome doesn't allow the Downloads folder itself.",
       "change": "Change",
       "choose": "Choose folder"
     },
